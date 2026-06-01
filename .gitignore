@@ -3,6 +3,8 @@
 
 # Generated screenshots and visual QA captures
 *.png
+!assets/
+!assets/*.png
 
 # Scratch reports from local agent runs
 agents/*.md
