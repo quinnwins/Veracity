@@ -1,14 +1,33 @@
-// First Principles Veracity — main app
+// First Principles Veracity - main app
 // One essay, with an appendix.
-// PlainEnglishView always renders — prose-first, zero Bayesian jargon, friend-speak.
+// PlainEnglishView always renders - prose-first, zero Bayesian jargon, plain language.
 // Below it, an Appendix unspools inline when the reader clicks "Show me the math":
-// LR chains, posteriors, sensitivity sweeps, the decomposition diagram, the audit
-// checklist. Same paper, same wordmark, same scroll — not a destination switch.
+// LR chains, posteriors, sensitivity sweeps, the decomposition diagram, and
+// the audit checklist. Same paper, same wordmark, same scroll - not a destination switch.
 
 const SAMPLES = [
   { id: "minwage", label: "Increasing the minimum wage always increases unemployment." },
   { id: "ai-engineers", label: "AI will make most software engineers obsolete within five years." },
   { id: "confidence", label: "People who sound confident are usually competent." }
+];
+
+const PUBLIC_METHOD_ITEMS = [
+  {
+    title: "Parse the wording",
+    text: "Separate the exact claim from stronger or weaker readings, loaded terms, and hidden definitions."
+  },
+  {
+    title: "Break it into pieces",
+    text: "Decompose the claim into subclaims and atomic premises so weak links are visible instead of buried."
+  },
+  {
+    title: "Compare rivals",
+    text: "Score competing explanations with comparable effort, then show what evidence would move the answer."
+  },
+  {
+    title: "Show the receipts",
+    text: "Expose uncertainty, source basis, sensitivity checks, and the gap between authored judgment and the math."
+  }
 ];
 
 const displayRange = (range) => (window.formatRange
@@ -32,7 +51,7 @@ function isVisible(node, analysis, digIds) {
 // Non-leaf nodes recompute as min(VISIBLE children's live estimates) ONLY IF
 // userPriors actually contains overrides — when userPriors is empty we honor
 // the analyst's authored estimate so adding `tunable: true` to a leaf doesn't
-// silently shift the parent verdict.
+// silently shift the parent estimate.
 function computeLiveEstimates(analysis, userPriors, digIds) {
   const live = {};
   const hasTunableInVisibleSubtree = {};
@@ -203,10 +222,10 @@ function computeProfileEstimates(analysis, analysisId, digIds) {
   });
 }
 
-// SensitivityPanel — renders the C0 verdict across all epistemic profiles.
+// SensitivityPanel renders the C0 estimate across all epistemic profiles.
 // Inputs: rows = [{ id, name, desc, range: [lo, hi] }, ...]
 // Above the table it shows two things:
-//   1. The verdict label of the "balanced" row (baseline).
+//   1. The assessment label of the "balanced" row (baseline).
 //   2. A robustness classification derived from the spread = max(hi) - min(lo).
 //      Spread < 0.15 → "Robust"
 //      Spread > 0.30 → "Parameter-dependent"
@@ -523,7 +542,7 @@ function AuditChecklist({ summary }) {
   );
 }
 
-// Compact vertical decomposition for Verdict mode: each direct child of C0 as a
+// Compact vertical decomposition: each direct child of C0 as a
 // card showing {kind icon} {text} {plain-English veracity label}. No diagram,
 // no inspector, no methodology — just the headline reasons.
 function VerdictDecomposition({ analysis }) {
@@ -711,6 +730,76 @@ function CourtroomPanel({ analysis, valueUnit }) {
       {Array.isArray(courtroom.outOfBoundsArguments) && courtroom.outOfBoundsArguments.length > 0 && (
         <window.OutOfBoundsArguments items={courtroom.outOfBoundsArguments} />
       )}
+    </section>
+  );
+}
+
+function PublicLanding() {
+  return (
+    <section className="public-landing" aria-labelledby="public-landing-title">
+      <div className="public-landing-backdrop" aria-hidden="true">
+        <div className="public-backdrop-row public-backdrop-row-a">
+          <span>claim</span>
+          <span>loaded terms</span>
+          <span>subclaims</span>
+          <span>rival hypotheses</span>
+        </div>
+        <div className="public-backdrop-row public-backdrop-row-b">
+          <span>prior</span>
+          <span>evidence weights</span>
+          <span>sensitivity</span>
+          <span>what would change the answer</span>
+        </div>
+        <div className="public-backdrop-row public-backdrop-row-c">
+          <span>source walkdown</span>
+          <span>coverage gaps</span>
+          <span>truthful revision</span>
+        </div>
+      </div>
+
+      <div className="public-landing-inner">
+        <p className="public-kicker">Veracity v0.9 browser prototype</p>
+        <h1 id="public-landing-title" className="public-title">
+          First-principles truth audits for claims that deserve more than vibes.
+        </h1>
+        <p className="public-subtitle">
+          Veracity turns "is this true?" into an inspectable chain of reasons. It breaks a claim into testable pieces,
+          makes uncertainty explicit, compares rival explanations, and shows the receipts behind the answer.
+        </p>
+        <div className="public-actions" aria-label="Public landing actions">
+          <a className="public-action public-action-primary" href="#sample-audit">View a sample audit</a>
+          <a className="public-action" href="#public-method">How it works</a>
+        </div>
+        <dl className="public-facts" aria-label="Project facts">
+          <div>
+            <dt>3</dt>
+            <dd>public demo claims</dd>
+          </div>
+          <div>
+            <dt>0/1</dt>
+            <dd>no forced yes/no answers</dd>
+          </div>
+          <div>
+            <dt>open</dt>
+            <dd>schema, math, and checks</dd>
+          </div>
+        </dl>
+      </div>
+
+      <div className="public-method" id="public-method" aria-label="How Veracity works">
+        {PUBLIC_METHOD_ITEMS.map((item, index) => (
+          <article className="public-method-item" key={item.title}>
+            <span className="public-method-step">{String(index + 1).padStart(2, "0")}</span>
+            <h2>{item.title}</h2>
+            <p>{item.text}</p>
+          </article>
+        ))}
+      </div>
+
+      <p className="public-caveat">
+        This is a prototype and operator method, not an oracle. The bundled analyses are demos; source-complete public reports
+        should capture dated primary sources before publication.
+      </p>
     </section>
   );
 }
@@ -1020,16 +1109,20 @@ function App() {
         </div>
       </header>
 
+      <PublicLanding />
+
       {/* ════════════════════════════════════════════════════════════
           PLAIN ESSAY — always rendered. The math unspools BELOW this
           inline (no destination switch) when the reader opens it.
           ════════════════════════════════════════════════════════════ */}
-      <PlainEnglishView
-        analysis={analysis}
-        activeSample={activeSample}
-        appendixOpen={appendixOpen}
-        onToggleAppendix={() => setAppendixOpen(v => !v)}
-      />
+      <div id="sample-audit" className="sample-audit-anchor">
+        <PlainEnglishView
+          analysis={analysis}
+          activeSample={activeSample}
+          appendixOpen={appendixOpen}
+          onToggleAppendix={() => setAppendixOpen(v => !v)}
+        />
+      </div>
 
       {/* ════════════════════════════════════════════════════════════
           APPENDIX — receipts, second opinions, decomposition, audit.
@@ -1038,7 +1131,7 @@ function App() {
           inside the same essay, just deeper in.
           ════════════════════════════════════════════════════════════ */}
       {appendixOpen && (
-      <section className="appendix" id="appendix" aria-label="Appendix — the math behind the verdict">
+      <section className="appendix" id="appendix" aria-label="Appendix - the math behind the assessment">
         {/* Printed-page rule. Marks the seam between essay and appendix
             without asserting a new identity. */}
         <div className="appendix-divider">
@@ -1047,8 +1140,8 @@ function App() {
             <span className="appendix-eyebrow">{analysis.courtroom ? "The full proceedings" : "Appendix"}</span>
             <span className="appendix-tagline">
               {analysis.courtroom
-                ? "Every step of the tribunal record — opening statements, custody ladder, Socratic rounds in full, the evidence ledger, sensitivity sweeps."
-                : "The math behind the verdict — receipts, cross-checks, sensitivity, audit."}
+                ? "Every step of the tribunal record - opening statements, custody ladder, Socratic rounds in full, the evidence ledger, sensitivity sweeps."
+                : "The math behind the assessment - receipts, cross-checks, sensitivity, audit."}
             </span>
           </div>
         </div>
@@ -1156,14 +1249,14 @@ function App() {
         <section className="appendix-section">
           <h2 className="appendix-h2"><span className="appendix-num">§B</span>Two ways to combine the sub-pieces</h2>
           <p className="appendix-intro">
-            The authored verdict takes the weakest link; the conjunctive view multiplies the pieces together under independence. Real claims usually sit between the two. A wide gap means the pieces are correlated, or the composition isn't strictly conjunctive.
+            The authored estimate takes the weakest link; the conjunctive view multiplies the pieces together under independence. Real claims usually sit between the two. A wide gap means the pieces are correlated, or the composition isn't strictly conjunctive.
           </p>
           <ConjunctiveBayesPanel analysis={analysis} conjBayesC0={conjBayes["C0"]} />
         </section>
 
         {/* § C · Which assumptions decide it alone? */}
         <section className="appendix-section">
-          <h2 className="appendix-h2"><span className="appendix-num">§C</span>Which assumptions decide the verdict alone?</h2>
+          <h2 className="appendix-h2"><span className="appendix-num">§C</span>Which assumptions decide the assessment alone?</h2>
           <p className="appendix-intro">
             Each tunable value swept across its full range. If one assumption can move the main claim by 15 points or more on its own, it's flagged as load-bearing — the kind of input that's being treated as fact when it shouldn't be.
           </p>
@@ -1172,9 +1265,9 @@ function App() {
 
         {/* § D · How robust to a different worldview? */}
         <section className="appendix-section">
-          <h2 className="appendix-h2"><span className="appendix-num">§D</span>How robust is the verdict to a different worldview?</h2>
+          <h2 className="appendix-h2"><span className="appendix-num">§D</span>How robust is the assessment to a different worldview?</h2>
           <p className="appendix-intro">
-            The same analysis re-run under {sensitivity.length} different epistemic profiles. A small spread means the verdict doesn't hinge on any one starting assumption.
+            The same analysis re-run under {sensitivity.length} different epistemic profiles. A small spread means the assessment doesn't hinge on any one starting assumption.
           </p>
           <SensitivityPanel rows={sensitivity} />
         </section>
@@ -1185,7 +1278,7 @@ function App() {
           <section className="appendix-section">
             <h2 className="appendix-h2"><span className="appendix-num">§E</span>Analyst starting point</h2>
             <p className="appendix-intro">
-              What the analyst brought into the analysis before scoring — the prior, the reference class, and the verdict they'd be reluctant to reach.
+              What the analyst brought into the analysis before scoring - the prior, the reference class, and the conclusion they'd be reluctant to reach.
             </p>
             <Stage0Panel audit={analysis.stage0} />
           </section>
@@ -1207,7 +1300,7 @@ function App() {
           <section className="appendix-section">
             <h2 className="appendix-h2"><span className="appendix-num">§G</span>Weakest premises</h2>
             <p className="appendix-intro">
-              The pieces that materially limit the conclusion. Strengthening or replacing one of these is what would shift the verdict.
+              The pieces that materially limit the conclusion. Strengthening or replacing one of these is what would shift the assessment.
             </p>
             <table className="lab appendix-table">
               <tbody>
@@ -1340,7 +1433,7 @@ function App() {
           <section className="appendix-section">
             <h2 className="appendix-h2"><span className="appendix-num">§M</span>Stress test</h2>
             <p className="appendix-intro">
-              How the verdict responds to perturbing the inputs.
+              How the assessment responds to perturbing the inputs.
             </p>
             <StressList items={analysis.stress} />
           </section>
@@ -1446,7 +1539,7 @@ function App() {
           <section className="appendix-section">
             <h2 className="appendix-h2"><span className="appendix-num">§S</span>Verification notes</h2>
             <p className="appendix-intro">
-              What to specify before re-running this analysis — open questions and gaps the operator should close before relying on the verdict.
+              What to specify before re-running this analysis - open questions and gaps the operator should close before relying on the assessment.
             </p>
             <NotesList items={analysis.verificationNotes} />
           </section>

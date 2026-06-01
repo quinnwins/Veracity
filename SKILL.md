@@ -1,6 +1,6 @@
 ---
 name: veracity-claim-audit
-description: Produce the most honest possible answer to "is this claim actually true?" — for political, scientific, historical, medical, financial, or otherwise contested questions. Outputs a calibrated credence band (not a verdict), the live cruxes, the observations that would move the band, and the strongest narrower formulation that survives scrutiny. Use whenever the cost of getting a contested question wrong is higher than the cost of running the procedure. The skill scales: a 90-second triage for most claims, a structured audit for serious ones, and a full Veracity-schema deep audit for claims worth publishing.
+description: Produce the most honest possible answer to "is this claim actually true?" for contested, high-stakes, or easily-misread questions. Outputs a calibrated credence band, the live cruxes, the observations that would move the band, and the strongest narrower formulation that survives scrutiny. Use whenever the cost of getting a claim wrong is higher than the cost of running the procedure. The skill scales: a 90-second triage for most claims, a structured audit for serious ones, and a full Veracity-schema deep audit for claims worth publishing.
 ---
 
 # Veracity Claim Audit
@@ -47,7 +47,7 @@ These are non-negotiable. An audit that violates any of them fails regardless of
 
 ## The procedure — pick the smallest mode that fits
 
-Don't run deeper machinery than the question needs. Over-machinery is the pretentiousness failure.
+Don't run deeper machinery than the question needs. Over-machinery creates method overhead without improving truth.
 
 **Before any mode, for time-sensitive claims:** if the claim is about current events, live legal / medical / financial / regulatory state, ongoing scientific debate, or anything whose ground truth has plausibly moved since training data was cut, verify the key facts against current primary sources (filings, journals, datasets, official statements, dated reporting) before scoring. A confident audit on stale facts is worse than abstention.
 
@@ -67,7 +67,7 @@ If the user wants more, escalate.
 
 Add to Mode 0:
 
-6. **Prior disclosure.** Your starting range and the reference class. Name the pressure (which verdict would punish you with which audience). Name the credence band you'd be uncomfortable issuing — that's the band you should examine hardest.
+6. **Prior disclosure.** Your starting range and the reference class. Name the pressure (which conclusion would punish you with which audience). Name the credence band you'd be uncomfortable issuing — that's the band you should examine hardest.
 7. **Hypothesis space.** List the competing hypotheses (≥2, usually 3–4). Decompose each to comparable depth. Score each subclaim with an estimate range.
 8. **Evidence walkdown.** For each major source: basis (study design / dataset / interview / theory), independence cluster (which other sources are correlated), what it directly supports, and an LR range. Collapse correlated sources before counting.
 9. **Sensitivity table.** For each load-bearing prior, list what its extreme does to the band. Flag any prior that alone flips the band.
@@ -161,7 +161,7 @@ Choose the smallest template that fits.
 
 ```
 **Claim (restated):** [...]
-**Prior:** [range; reference class; pressure; uncomfortable verdict you'd avoid]
+**Prior:** [range; reference class; pressure; uncomfortable conclusion you'd avoid]
 **Term Split:** [loaded term → chosen reading → why]
 **Hypotheses:** H0 / H1 / H2 [/ H3], each with a one-line description and an estimate band; each decomposed to comparable depth
 **Evidence Walkdown:** [grouped by primary basis and independence cluster; LR range per cluster]

@@ -285,7 +285,7 @@ function invertRange(r) {
   return [1 - r[1], 1 - r[0]];
 }
 
-// Plain-English one-liner that pairs with the verdict label. Used in the hero
+// Plain-English one-liner that pairs with the assessment label. Used in the hero
 // banner so the operator gets headline + one sentence, no jargon.
 function verdictHeadline(label) {
   switch (label) {
@@ -387,12 +387,12 @@ function CrossChecks({ baseEstimate, lrPosterior, lrLabel, lrDelta, conjBayesSho
           </span>
         )}
         {(lrDisagrees || cbDisagrees) && (
-          <span className="cross-checks-disagree" title="An alternative computation reaches a notably different verdict — a soft prompt to look closer at why the two approaches diverge.">
+          <span className="cross-checks-disagree" title="An alternative computation reaches a notably different assessment - a soft prompt to look closer at why the two approaches diverge.">
             A different lens disagrees
           </span>
         )}
         {hasAuditFlags && (
-          <span className="cross-checks-flagged" title="One or more self-checks on this analysis raised a flag worth re-reading before relying on the verdict.">
+          <span className="cross-checks-flagged" title="One or more self-checks on this analysis raised a flag worth re-reading before relying on the assessment.">
             {auditSummary.flagCount} thing{auditSummary.flagCount === 1 ? "" : "s"} to re-read
           </span>
         )}
@@ -432,7 +432,7 @@ function CrossChecks({ baseEstimate, lrPosterior, lrLabel, lrDelta, conjBayesSho
 
         {hasAuditFlags && auditSummary && (
           <div className="cross-checks-audit"
-            title={`Self-checks on this analysis across ${auditSummary.total} checks.\n\nFLAGGED (${auditSummary.flags.length}):\n${auditSummary.flags.map(f => "• " + f).join("\n") || "(none)"}\n\nPASSED (${auditSummary.passes.length}):\n${auditSummary.passes.map(p => "• " + p).join("\n") || "(none)"}\n\nFlags aren't invalidating — they're aspects of the analysis worth re-reading before relying on the verdict.`}>
+            title={`Self-checks on this analysis across ${auditSummary.total} checks.\n\nFLAGGED (${auditSummary.flags.length}):\n${auditSummary.flags.map(f => "• " + f).join("\n") || "(none)"}\n\nPASSED (${auditSummary.passes.length}):\n${auditSummary.passes.map(p => "• " + p).join("\n") || "(none)"}\n\nFlags aren't invalidating - they're aspects of the analysis worth re-reading before relying on the assessment.`}>
             <span className="cross-checks-audit-label">Things to re-read:</span>{" "}
             {auditSummary.flagCount} of {auditSummary.total} self-checks raised a flag.
             {" "}Full list below in <em>Self-checks on this analysis</em>.
@@ -717,7 +717,7 @@ function plainifyRanges(text) {
   });
 }
 
-// Plain-English verdict — what the headline percentage means in friend-speak.
+// Plain-English assessment - what the headline percentage means in plain language.
 function plainVerdictExplanation(v, baseEstimate, confidence) {
   const mid = (baseEstimate[0] + baseEstimate[1]) / 2;
   const oddsPhrase = plainOdds(mid);
@@ -746,8 +746,8 @@ function capitalize(s) {
 }
 
 // Build a plain-English sentence for each direct child of the main claim.
-// We use the node's text directly (already prose), pair with a plain verdict
-// word, and explain confidence in friend-speak. No IDs, no percentage bars,
+// We use the node's text directly (already prose), pair with a plain assessment
+// word, and explain confidence in plain language. No IDs, no percentage bars,
 // no "subclaim" label — just "First, ..." / "Second, ..." / "Third, ...".
 function plainReasonsList(analysis) {
   const c0Children = Object.values(analysis.nodes)
@@ -772,7 +772,7 @@ function plainReasonsList(analysis) {
 // Steelman built from the strongest alternative hypothesis. If the analysis
 // includes `hypotheses`, we pick the one with the highest support tag (or, if
 // tied, the first non-default hypothesis) and render it as prose. This is the
-// "strongest case against our verdict" the reader sees in plain mode.
+// "strongest case against our assessment" the reader sees in plain mode.
 function plainSteelman(analysis) {
   const items = analysis.hypotheses || [];
   if (!items.length) return null;
@@ -821,7 +821,7 @@ function plainGaps(analysis) {
 // switching to a separate destination.
 //
 // Layout contract: the first fold contains only the claim and a single
-// confidence line. Everything else — verdict prose, evidence, cruxes — sits
+// confidence line. Everything else - assessment prose, evidence, cruxes - sits
 // below the fold and rewards a deliberate scroll. This is the "0 cognitive
 // load" surface: one question per screen, one answer per screen.
 // renderCourtroomPlain — the FULL plain-mode tribunal proceeding for entries
@@ -1144,7 +1144,7 @@ function PlainEnglishView({ analysis, activeSample, appendixOpen, onToggleAppend
 
       {steelman && (
         <div className="plain-section plain-steelman">
-          <h2 className="plain-h2">The strongest case against our verdict</h2>
+          <h2 className="plain-h2">The strongest case against our assessment</h2>
           <p className="plain-prose">
             A reasonable person could push back this way: <em>{steelman.statement}</em>
             {steelman.note && <> &nbsp;{steelman.note}</>}
@@ -1156,7 +1156,7 @@ function PlainEnglishView({ analysis, activeSample, appendixOpen, onToggleAppend
         <div className="plain-section">
           <h2 className="plain-h2">What would change our mind</h2>
           <p className="plain-prose plain-prose-intro">
-            These are the observations that would actually move our answer — what to look for if you want to challenge the verdict.
+            These are the observations that would actually move our answer - what to look for if you want to challenge the analysis.
           </p>
           <ul className="plain-cruxes">
             {cruxes.map((c, i) => (
@@ -1203,7 +1203,7 @@ function PlainEnglishView({ analysis, activeSample, appendixOpen, onToggleAppend
                 ? "The complete tribunal record: opening statements in full, custody ladder with every example, all five Socratic rounds with prosecution + defense submissions, the evidence ledger with custody discounts, the sensitivity sweeps."
                 : "Below this sits the full tribunal record: openings, custody ladder, every Socratic round in full, the evidence ledger with custody discounts, sensitivity sweeps, the audit checklist. Optional — but it's all there.")
             : (appendixOpen
-                ? "Walk through the evidence, the cross-checks, the sensitivity sweeps, the audit ledger — every number that feeds the verdict above."
+                ? "Walk through the evidence, the cross-checks, the sensitivity sweeps, the audit ledger - every number that feeds the assessment above."
                 : "Underneath this analysis sits the math: the prior, the evidence weights, the cross-checks, the sensitivity sweeps, the audit ledger. It's optional — but it's all there.")}
         </p>
         <button
@@ -1225,16 +1225,16 @@ function PlainEnglishView({ analysis, activeSample, appendixOpen, onToggleAppend
 }
 
 // ════════════════════════════════════════════════════════════════════
-// Show-the-math (nerd) mode components
+// Show-the-math technical components
 // ════════════════════════════════════════════════════════════════════
 //
-// Aesthetic contract: this view leans HARD into the technical aesthetic.
+// Aesthetic contract: this view leans into technical notation.
 // Monospace for formulas, IDs, and numeric outputs. Greek and operator
 // notation are welcome. Brief inline glossary tooltips let the
-// nerd-curious learn the vocabulary without condescending text. Layout
+// technically curious readers learn the vocabulary without condescending text. Layout
 // evokes a research notebook, not a consumer dashboard.
 
-// Inline glossary tooltip for the nerd mode header. Picks up technical
+// Inline glossary tooltip for the technical header. Picks up technical
 // terms on first occurrence per page (handled at the component level —
 // each header element renders its own first-occurrence tooltip).
 const NERD_GLOSSARY = {
