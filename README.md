@@ -6,6 +6,12 @@ It is built for claims that deserve more than a quick yes/no answer. Veracity br
 
 The goal is not to decree truth. The goal is to make an answer inspectable.
 
+## Screenshots
+
+![Veracity public landing page](assets/veracity-landing.png)
+
+![Veracity sample audit view](assets/veracity-sample-audit.png)
+
 ## What It Does
 
 - Parses loaded wording so a claim is not quietly swapped for an easier version.
