@@ -1,0 +1,9 @@
+# Local browser automation captures
+.playwright-mcp/
+
+# Generated screenshots and visual QA captures
+*.png
+
+# Scratch reports from local agent runs
+agents/*.md
+.claude/

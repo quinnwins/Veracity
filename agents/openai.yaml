@@ -1,0 +1,4 @@
+interface:
+  display_name: "Veracity Claim Audit"
+  short_description: "Fair audits for controversial claims"
+  default_prompt: "Use $veracity-claim-audit to evaluate this controversial claim fairly and identify the strongest truthful revision."
