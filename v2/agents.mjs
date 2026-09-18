@@ -102,9 +102,10 @@ export class CommandAgentProvider {
     this.budget.record(`harness:${this.name}`, response.model, response.usage || null, request.requestId);
     return response.output;
   }
+  async structured(task, instructions, input, schema, signal) { return this.invoke(task, instructions, input, schema, signal); }
   async json(task, instructions, input, signal) {
     requireThat(SCHEMAS[task], `Unknown structured task ${task}`);
-    return this.invoke(task, instructions, input, SCHEMAS[task], signal);
+    return this.structured(task, instructions, input, SCHEMAS[task], signal);
   }
   async search(node, contract, signal) {
     requireThat(this.capabilities.search === true, `Agent ${this.name} is not configured for source search`, 'NO_SEARCH', 503);
@@ -142,7 +143,8 @@ export class HttpAgentProvider {
     this.budget.record(`harness:${this.name}`, result.model, result.usage || null, request.requestId);
     return result.output;
   }
-  async json(task, instructions, input, signal) { requireThat(SCHEMAS[task], `Unknown structured task ${task}`); return this.invoke(task, instructions, input, SCHEMAS[task], signal); }
+  async structured(task, instructions, input, schema, signal) { return this.invoke(task, instructions, input, schema, signal); }
+  async json(task, instructions, input, signal) { requireThat(SCHEMAS[task], `Unknown structured task ${task}`); return this.structured(task, instructions, input, SCHEMAS[task], signal); }
   async search(node, contract, signal) {
     requireThat(this.capabilities.search === true, `Agent ${this.name} is not configured for source search`, 'NO_SEARCH', 503);
     const output = await this.invoke('search', 'Find original evidence for AND against this proposition. Return HTTPS source URLs only.', {proposition: node.text, falsifier: node.falsifier, contract}, SEARCH_SCHEMA, signal);

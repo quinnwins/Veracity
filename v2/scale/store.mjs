@@ -52,10 +52,15 @@ export class ScaleStore {
   }
   sql(s) { if (!this.statements.has(s)) this.statements.set(s, this.db.prepare(s)); return this.statements.get(s); }
   tx(fn) { this.db.exec('BEGIN IMMEDIATE'); try { const r = fn(); this.db.exec('COMMIT'); return r; } catch (e) { this.db.exec('ROLLBACK'); throw e; } }
-  create({contract: c, packets, tasks, limits = {}, model = 'jev-1.13.0', simulation = false, parent = null, plan = null}) {
+  create({contract: c, packets, tasks, limits = {}, model = 'jev-1.13.0', namespace, estimator, simulation = false, parent = null, plan = null}) {
     const contract = validateContract(c), config = options(limits), id = randomUUID(), at = stamp();
-    requireThat(/^jev-\d+\.\d+\.\d+$/.test(model), 'Pin the Jev model version');
+    requireThat(typeof model === 'string' && model.length >= 3 && model.length <= 240, 'Invalid probability estimator model');
+    if (model.startsWith('jev-')) requireThat(/^jev-\d+\.\d+\.\d+$/.test(model), 'Pin the Jev model version');
     requireThat(typeof simulation === 'boolean', 'Invalid simulation flag');
+    namespace ||= simulation ? 'synthetic-v1' : 'typesafe-live';
+    requireThat(typeof namespace === 'string' && /^[A-Za-z0-9_.:@-]{3,240}$/.test(namespace), 'Invalid probability-provider namespace');
+    estimator ||= simulation ? {kind: 'synthetic', id: 'synthetic', model} : {kind: 'jev', id: 'jev', model};
+    requireThat(estimator && ['synthetic','jev','agent'].includes(estimator.kind) && typeof estimator.id === 'string', 'Invalid probability estimator metadata');
     requireThat(this.sql('SELECT count(*) AS n FROM runs').get().n < 30, 'Campaign retention limit reached', 'RETENTION_LIMIT', 409);
     requireThat(Array.isArray(packets) && packets.length > 0 && packets.length <= 10000, 'Invalid packet list');
     const map = new Map(), prepared = []; let sourceBytes = 0;
@@ -66,9 +71,11 @@ export class ScaleStore {
       map.set(p.id, checked.hash); prepared.push(checked); sourceBytes += Buffer.byteLength(canonicalJSON(checked));
     }
     requireThat(sourceBytes <= 64000000, 'Corpus exceeds 64 MB campaign limit');
-    const metadata = {contract, model, simulation, parent, plan, version: SCALE_VERSION,
+    const metadata = {contract, model, namespace, estimator, simulation, parent, plan, version: SCALE_VERSION,
       interpretation: 'Local model probabilities conditional on the exact evidence packet; uncalibrated, not independent observations or likelihood ratios',
-      costScope: 'Jev only; byte-based reservations are conservative estimates, not guaranteed billable token counts. Planning/review costs are separate.'};
+      costScope: estimator.kind === 'jev'
+        ? 'Jev only; byte-based reservations are conservative estimates, not guaranteed billable token counts. Planning/review costs are separate.'
+        : 'Agent/harness scoring cost is not estimated by Veracity. Harness subscription/API usage, planning and review are separate.'};
     this.tx(() => {
       this.sql('INSERT INTO runs(id,created_at,updated_at,status,metadata,limits_json) VALUES(?,?,?,?,?,?)').run(id, at, at, 'planned', canonicalJSON(metadata), canonicalJSON(config));
       for (const p of prepared) this.sql('INSERT OR IGNORE INTO packets(hash,document) VALUES(?,?)').run(p.hash, canonicalJSON(p));
@@ -88,7 +95,7 @@ export class ScaleStore {
       const save = () => {
         if (!group.length) return;
         const packed = makeBody(model, current, group);
-        const key = auditHash({namespace: simulation ? 'synthetic-v1' : 'typesafe-live', version: SCALE_VERSION, body: packed.body});
+        const key = auditHash({namespace, version: SCALE_VERSION, body: packed.body});
         this.sql('INSERT INTO batches(run_id,key,seq,body,units) VALUES(?,?,?,?,?)').run(id, key, index++, canonicalJSON(packed.body), packed.units);
         for (const t of group) this.sql('UPDATE tasks SET batch_key=? WHERE run_id=? AND id=?').run(key, id, t.id);
         group = []; questionBytes = 0;
@@ -121,12 +128,18 @@ export class ScaleStore {
     const batches = this.sql('SELECT count(*) n,coalesce(sum(units),0) units,coalesce(sum(cached),0) cached FROM batches WHERE run_id=?').get(id);
     const reviews = Object.fromEntries(this.sql("SELECT review_status status,count(*) n FROM tasks WHERE run_id=? AND status='completed' GROUP BY review_status").all(id).map(x => [x.status, x.n]));
     const limits = JSON.parse(r.limits_json);
-    return {id, createdAt: r.created_at, updatedAt: r.updated_at, status: r.status, ...JSON.parse(r.metadata), limits,
+    const metadata = JSON.parse(r.metadata);
+    metadata.namespace ||= metadata.simulation ? 'synthetic-v1' : 'typesafe-live';
+    metadata.estimator ||= metadata.simulation ? {kind: 'synthetic', id: 'synthetic', name: 'Synthetic', model: metadata.model}
+      : {kind: 'jev', id: 'jev', name: 'Jev', driver: 'typesafe', model: metadata.model};
+    const priced = metadata.estimator?.kind === 'jev';
+    return {id, createdAt: r.created_at, updatedAt: r.updated_at, status: r.status, ...metadata, limits,
       planHash: r.plan_hash, error: r.error, counts, total: Object.values(counts).reduce((a, b) => a + b, 0),
       duplicateQuestions: r.duplicates, batches: batches.n, cacheHits: batches.cached,
-      estimate: {inputUnits: batches.units, jevUSD: batches.units * limits.inputUSDPerMillion / 1e6, basis: 'UTF-8 bytes plus overhead; excludes retries, planning, review'},
+      estimate: {inputUnits: batches.units, providerUSD: priced ? batches.units * limits.inputUSDPerMillion / 1e6 : null,
+        basis: priced ? 'UTF-8 bytes plus overhead; Jev estimate only; excludes retries, planning and review' : 'Harness/API scoring cost is unknown to Veracity; request and input reservations still bound dispatch'},
       usage: {requests: r.requests, reservedOrReportedUnits: r.units, reportedInputTokens: r.reported_tokens,
-        reportedJevUSD: r.reported_tokens * limits.inputUSDPerMillion / 1e6,
+        reportedProviderUSD: priced ? r.reported_tokens * limits.inputUSDPerMillion / 1e6 : null,
         unknownAttempts: this.sql("SELECT count(*) n FROM attempts WHERE run_id=? AND status='unknown'").get(id).n},
       reviews, reviewLog: JSON.parse(r.review_log)};
   }
@@ -137,7 +150,10 @@ export class ScaleStore {
     const rows = this.sql('SELECT * FROM tasks WHERE run_id=? AND seq>? AND (? IS NULL OR review_status=?) ORDER BY seq LIMIT ?').all(id, after, review, review, limit + 1);
     return {items: rows.slice(0, limit).map(r => this.decodeTask(r)), next: rows.length > limit ? rows[limit - 1].seq : null};
   }
-  decodeTask(r) { const spec = JSON.parse(r.spec); requireThat(auditHash({q: spec.q, packetHash: spec.packetHash, promptVersion: spec.promptVersion}) === r.id && spec.packetHash === r.packet_hash, 'Question integrity failure', 'STORE_INTEGRITY', 500); if (r.status === 'completed') requireThat(r.score_sha === auditHash({id: r.id, batchKey: r.batch_key, probability: r.score}), 'Estimate integrity failure', 'STORE_INTEGRITY', 500); return {...spec, priority: Object.keys(levels).find(k => levels[k] === r.priority), seq: r.seq, status: r.status, probability: r.score, batchKey: r.batch_key, review: {status: r.review_status, reason: r.review_reason}, calibration: 'not-evaluated', semantics: 'P(proposition | supplied evidence, model)'}; }
+  decodeTask(r) { const spec = JSON.parse(r.spec); requireThat(auditHash({q: spec.q, packetHash: spec.packetHash, promptVersion: spec.promptVersion}) === r.id && spec.packetHash === r.packet_hash, 'Question integrity failure', 'STORE_INTEGRITY', 500);
+    if (r.status === 'completed') requireThat(r.score_sha === auditHash({id: r.id, batchKey: r.batch_key, probability: r.score}), 'Estimate integrity failure', 'STORE_INTEGRITY', 500);
+    if (r.status === 'abstained') requireThat(typeof r.review_reason === 'string' && r.review_reason.length >= 8 && r.score_sha === auditHash({id: r.id, batchKey: r.batch_key, abstain: true, reason: r.review_reason}), 'Abstention integrity failure', 'STORE_INTEGRITY', 500);
+    return {...spec, priority: Object.keys(levels).find(k => levels[k] === r.priority), seq: r.seq, status: r.status, probability: r.score, batchKey: r.batch_key, review: {status: r.review_status, reason: r.review_reason}, calibration: 'not-evaluated', semantics: 'P(proposition | supplied evidence, model)'}; }
   *each(id) { for (const r of this.db.prepare('SELECT * FROM tasks WHERE run_id=? ORDER BY seq').iterate(id)) yield this.decodeTask(r); }
   start(id, planHash) {
     return this.tx(() => {
@@ -155,7 +171,8 @@ export class ScaleStore {
       if (!b) return null;
       this.sql("UPDATE batches SET status='inflight' WHERE run_id=? AND key=?").run(id, b.key);
       const body = JSON.parse(b.body), run = JSON.parse(this.sql('SELECT metadata FROM runs WHERE id=?').get(id).metadata);
-      requireThat(auditHash({namespace: run.simulation ? 'synthetic-v1' : 'typesafe-live', version: SCALE_VERSION, body}) === b.key, 'Batch integrity failure', 'STORE_INTEGRITY', 500);
+      const namespace = run.namespace || (run.simulation ? 'synthetic-v1' : 'typesafe-live');
+      requireThat(auditHash({namespace, version: run.version || SCALE_VERSION, body}) === b.key, 'Batch integrity failure', 'STORE_INTEGRITY', 500);
       return {...b, body};
     });
   }
@@ -164,9 +181,11 @@ export class ScaleStore {
       const row = this.sql('SELECT status,units,requests,limits_json FROM runs WHERE id=?').get(id);
       requireThat(row, 'Campaign not found');
       const r = {status: row.status, limits: JSON.parse(row.limits_json), usage: {reservedOrReportedUnits: row.units, requests: row.requests}};
+      const meta = JSON.parse(this.sql('SELECT metadata FROM runs WHERE id=?').get(id).metadata);
       const cost = (row.units + b.units) * r.limits.inputUSDPerMillion / 1e6;
       requireThat(r.status === 'running', 'Campaign was stopped', 'RUN_STATE', 409);
-      requireThat(r.usage.requests < r.limits.maxRequests && r.usage.reservedOrReportedUnits + b.units <= r.limits.maxInputUnits && cost <= r.limits.maxJevUSD, 'Jev dispatch budget reached; campaign paused before another request', 'BUDGET', 409);
+      const withinCost = meta.estimator?.kind !== 'jev' || cost <= r.limits.maxJevUSD;
+      requireThat(r.usage.requests < r.limits.maxRequests && r.usage.reservedOrReportedUnits + b.units <= r.limits.maxInputUnits && withinCost, 'Probability dispatch budget reached; campaign paused before another request', 'BUDGET', 409);
       const attempt = randomUUID();
       this.sql('INSERT INTO attempts(id,run_id,batch_key,at,reserved) VALUES(?,?,?,?,?)').run(attempt, id, b.key, stamp(), b.units);
       this.sql('UPDATE runs SET requests=requests+1,units=units+?,updated_at=? WHERE id=?').run(b.units, stamp(), id);
@@ -192,7 +211,10 @@ export class ScaleStore {
     this.tx(() => {
       const state = this.sql('SELECT status FROM batches WHERE run_id=? AND key=?').get(id, b.key);
       requireThat(state?.status === 'inflight', 'Batch lease no longer active', 'RUN_STATE', 409);
-      for (const [q, a] of Object.entries(response.answers)) this.sql("UPDATE tasks SET status='completed',score=?,score_sha=? WHERE run_id=? AND id=? AND batch_key=?").run(probability(a.noul), auditHash({id: q, batchKey: b.key, probability: a.noul}), id, q, b.key);
+      for (const [q, a] of Object.entries(response.answers)) {
+        if (a.type === 'abstain') this.sql("UPDATE tasks SET status='abstained',score=NULL,score_sha=?,review_reason=? WHERE run_id=? AND id=? AND batch_key=?").run(auditHash({id: q, batchKey: b.key, abstain: true, reason: a.reason}), a.reason, id, q, b.key);
+        else this.sql("UPDATE tasks SET status='completed',score=?,score_sha=? WHERE run_id=? AND id=? AND batch_key=?").run(probability(a.noul), auditHash({id: q, batchKey: b.key, probability: a.noul}), id, q, b.key);
+      }
       const encoded = canonicalJSON(response);
       this.sql("UPDATE batches SET status='completed',response=?,cached=?,error=NULL WHERE run_id=? AND key=?").run(encoded, Number(cached), id, b.key);
       if (!cached) this.sql('INSERT OR REPLACE INTO cache(key,response,sha256,at) VALUES(?,?,?,?)').run(b.key, encoded, auditHash(response), Date.now());

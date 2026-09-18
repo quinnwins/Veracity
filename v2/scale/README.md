@@ -6,7 +6,7 @@ A runnable Veracity V2 extension for strong orchestration, cheaper research work
 
 1. A configured strong model plans assumption families and rival explanations, tied to a saved assessment's graph.
 2. An explicitly configured cheaper model extracts scoped empirical questions from stored source windows. Every question needs a falsifier, yes/no criteria and a brief exact source quotation. Fabricated quotations and invalid parent mappings are rejected.
-3. Pinned Jev Noul calls estimate `P(proposition | supplied evidence, model)` in shared-context batches. These are direct local estimates, not independent observations, likelihood ratios or a final root probability.
+3. A selected probability estimator—pinned Jev **or a configured grunt/harness agent**—estimates `P(proposition | supplied evidence, model)` in shared-context batches. Harness agents use strict JSON output and may explicitly abstain. These are direct local model estimates, not independent observations, likelihood ratios or a final root probability.
 4. A bounded strong-model review queue selects consequential, weak-fit and uncertain inputs plus a seeded random sample of confident estimates. Acceptance remains a model review, not empirical calibration.
 5. An explicit API/CLI composition graph can combine accepted estimates under disclosed logical and dependence assumptions. It does not silently overwrite the original research assessment.
 
@@ -25,7 +25,7 @@ Open `http://127.0.0.1:8787/scale`. No-key simulations exercise real storage, ba
 
 For live work, select the **orchestrator** and **grunt/worker** independently. Direct OpenAI API models remain supported, but they are no longer required for those roles: Codex, Claude Code, Gemini CLI, an Antigravity/IDE bridge, or any `veracity-agent/v1` command/HTTP adapter can fill either role. Configure `TYPESAFE_API_KEY` and a pinned `JEV_MODEL` separately for the probability tier. See `../HARNESS_AGENTS.md`. Normal live research requires the chosen worker to expose source-search capability; Probability Lab extraction can operate over already-saved evidence without search. No paid model is silently chosen.
 
-Research an empirical question first, then expand its saved evidence in the lab. Preparation spends bounded orchestrator/worker calls. Jev scoring starts only after approving the saved plan and its estimate. Strong-model review needs separate approval. Stopping dispatch does not guarantee in-flight requests are unbilled.
+Research an empirical question first, then expand its saved evidence in the lab. Preparation spends bounded orchestrator/worker calls. Probability scoring starts only after approving the saved plan. Jev is optional; a selected grunt/harness agent can return the same ledger-level JSON probabilities. Strong-model review needs separate approval. Stopping dispatch does not guarantee in-flight requests are unbilled.
 
 ## Scale and evidence limits
 
@@ -75,3 +75,7 @@ The scale implementation passed 213 automated tests and a three-pass 100,000-que
 The next scientific test is equal-budget strong-only research versus strong orchestration, cheap extraction, Jev breadth and selective review. Measure missed decisive evidence, calibration, latency and total cost—not merely agreement with another model. Existing `evaluate.mjs` can score properly dated resolved predictions; no fabricated factual benchmark or calibrator is bundled.
 
 Official integration references: https://docs.typesafe.ai/models ; https://docs.typesafe.ai/api ; https://docs.typesafe.ai/primitives/noul ; https://developers.openai.com/api/docs/guides/structured-outputs . Recheck current provider limits and prices before deployment.
+
+### Working without a Jev API key
+
+No TypeSafe credential is required to use Probability Lab. Select a configured grunt/harness agent in the **Probability estimator** dropdown. The same durable batching, cache, provenance and review path is used. Jev-specific dollar previews are hidden for harness/API estimators because Veracity cannot infer subscription or provider billing. Request/input reservation limits still bound dispatch.
