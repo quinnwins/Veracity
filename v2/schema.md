@@ -1,108 +1,26 @@
-# V2 canonical data contract
+# Runtime data contract
 
-```ts
-type ProbabilityRange = [number, number];
+The executable validators in `decomposition.mjs`, `engine.mjs`, and `evidence.mjs`, and the provider JSON schemas in `providers.mjs`, are authoritative. This document describes the persisted model, not a second implementation.
 
-type Provenance =
-  | { kind: "measured"; sourceId: string; method?: string }
-  | { kind: "model"; provider: string; model: string; questionId: string }
-  | { kind: "elicited"; actor: "user" | "analyst"; rationale: string }
-  | { kind: "derived"; rule: string; inputIds: string[] };
+An assessment record has a generated UUID, revision, question, status, kind, timestamps, model, computed analysis, events, usage, warnings, optional parentId, and snapshots. Each snapshot stores the full model, its hash, engine version, range, reason, and timestamp.
 
-type Relation =
-  | { kind: "and"; children: string[]; dependence: "independent" | "bounded" | "modeled" }
-  | { kind: "or"; children: string[]; exclusivity: "exclusive" | "overlapping" }
-  | { kind: "evidence"; evidenceIds: string[] }
-  | { kind: "alternative_set"; children: string[]; exclusive: boolean; exhaustive: boolean }
-  | { kind: "informational"; children: string[] };
+## Model
 
-interface ClaimContract {
-  id: string;
-  wording: string;
-  reading: string;
-  population?: string;
-  geography?: string;
-  horizon?: string;
-  outcome?: string;
-  loadedTerms: Array<{ term: string; meaning: string; alternatives: string[] }>;
-  falsifier: string;
-}
+- `contract`: exact `wording`, selected `reading`, `falsifier`, `scope`, alternate readings, `needsClarification`, and `mode` (`empirical` or `descriptive`). Historical imports may carry `asOf`; unknown publication dates fail historical evidence checks.
+- `rootId`, `rivalRootIds`, and a `nodes` map. Rivals are separate roots for reachability, not automatically exclusive hypotheses.
+- `sources`: IDs map to title, URL, preserved text, SHA-256, kind (`fetched`, `user-provided`, or explicitly demo-only `synthetic`), retrieval time, and publication time or null.
+- `evidence`: IDs map to observation, targetNodeIds, explicit independenceCluster, exact source references, and likelihood `{lr:[low,high], provenance}`.
+- `reviewStatus`: completed or incomplete for the automated pipeline. Incomplete blocks numerical recomputation.
+- `versions`, retrieval records, warnings, and optional `demo: true`.
 
-interface BeliefNode {
-  id: string;
-  text: string;
-  type: "claim" | "subclaim" | "premise" | "atomic" | "hypothesis";
-  prior?: ProbabilityRange;
-  posterior?: ProbabilityRange;
-  provenance?: Provenance;
-  relation?: Relation;
-  tunable?: boolean;
-  status: "scored" | "unscored" | "abstain";
-}
+## Nodes
 
-interface EvidenceItem {
-  id: string;
-  observation: string;
-  sourceId: string;
-  sourceSpan?: string;
-  targetNodeIds: string[];
-  independenceCluster: string;
-  status: "observed" | "disputed" | "ungrounded";
-  likelihood?: {
-    lr?: ProbabilityRange;
-    provenance: Provenance;
-  };
-  judgments?: ModelJudgment[];
-}
+Each node has text, a type (claim/subclaim/premise/atomic/hypothesis/definition/value), a falsifier for empirical types, optional relation, and next-investigation guidance. Operational atomicity records a status and reason; a budget stop is unresolved, not proof that further decomposition is impossible.
 
-interface ModelJudgment {
-  id: string;
-  task: "relevance" | "direction" | "dedupe" | "measurement_fit" | "classification";
-  provider: string;
-  model: string;
-  question: string;
-  options: Array<{ label: string; probability: number }>;
-  sourceIds: string[];
-  createdAt: string;
-}
+A relation includes kind, child IDs, equivalence/rationale, and dependence or exclusivity semantics. AND/OR without genuine equivalence is unscored; informational links are not multiplied.
 
-interface Assessment {
-  contract: ClaimContract;
-  nodes: Record<string, BeliefNode>;
-  evidence: Record<string, EvidenceItem>;
-  rootId: string;
-  credence?: ProbabilityRange;
-  grounding: number;
-  stability: number;
-  cruxes: Crux[];
-  nextInvestigations: Investigation[];
-  snapshots: Snapshot[];
-}
+Probability inputs additionally require an ordered prior range, referenceClass, and provenance with kind/rationale. Optional plausiblePrior bounds drive scenarios. Multiple evidence clusters require independenceRationale. Model-elicited priors/LRs are labeled uncalibrated. Jev judgments are separate diagnostic envelopes with pinned versions and answer distributions.
 
-interface Crux {
-  nodeId: string;
-  baseline: ProbabilityRange;
-  lowScenario: ProbabilityRange;
-  highScenario: ProbabilityRange;
-  maxSwing: number;
-}
+## Computed analysis
 
-interface Investigation {
-  targetNodeId: string;
-  question: string;
-  possibleObservation: string;
-  expectedInformationGain?: number;
-  expectedPosteriorSwing?: number;
-  costClass: "instant" | "search" | "deep-research" | "external";
-  rationale: string;
-}
-
-interface Snapshot {
-  at: string;
-  credence: ProbabilityRange;
-  changedInputs: string[];
-  explanation: string;
-}
-```
-
-Credence, grounding, and stability are deliberately separate. A polished 80% must not disguise weak grounding or extreme prior sensitivity.
+`root` and `nodes` contain derived ranges or explicit unscored/descriptive states, reasons, applied rules, and dependency IDs. Diagnostics include probabilityInputIds, sensitivity cruxes, nextInvestigations, grounding counts, implemented sensitivity scope, engineVersion, and calibration status. No authored headline competes with the graph's declared computation.

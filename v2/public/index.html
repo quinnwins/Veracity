@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><link rel="icon" href="data:,"><title>Veracity — A closer look</title><link rel="stylesheet" href="/styles.css"><script type="module" src="/app.mjs"></script></head>
+<body>
+<a class="skip" href="#main">Skip to research</a>
+<header class="topbar"><a href="/" class="wordmark" aria-label="Veracity home"><span class="brand-mark" aria-hidden="true">◎</span> Veracity <span class="version">V2</span></a><div class="top-actions"><span id="connection" class="connection">Checking connection</span><button id="history-button" class="quiet">Saved research <span aria-hidden="true">↗</span></button></div></header>
+<main id="main" tabindex="-1"></main>
+<div id="notice" role="alert" class="notice" hidden></div>
+<dialog id="history-dialog" aria-labelledby="history-title"><div class="dialog-head"><h2 id="history-title">Saved research</h2><button data-close="history-dialog" class="icon" aria-label="Close saved research">×</button></div><div id="history-list"></div></dialog>
+<dialog id="evidence-dialog" aria-labelledby="evidence-title"><div class="dialog-head"><h2 id="evidence-title">Add an observation</h2><button data-close="evidence-dialog" class="icon" aria-label="Close evidence form">×</button></div><p class="muted">Store the exact source passage and disclose the likelihood assumptions. User-provided text is not independently verified.</p><form id="evidence-form" class="stack">
+<label>Target assumption<select name="nodeId" id="evidence-node" required></select></label>
+<label>Source title<input name="title" required maxlength="300"></label><label>Source URL <span class="optional">optional</span><input name="url" type="url" placeholder="https://…"></label>
+<label>Source text<textarea name="text" required minlength="20" maxlength="60000" rows="4"></textarea></label><label>Exact quoted passage<textarea name="quote" required minlength="5" maxlength="2000" rows="2"></textarea></label>
+<label>Underlying study or observation ID<input name="cluster" required minlength="3" maxlength="120"><small>Reuse an existing ID to replace its update, rather than count it twice.</small></label>
+<div class="form-pair"><label>Likelihood ratio · low<input name="lrLow" type="number" min="0.000000001" step="any" required></label><label>Likelihood ratio · high<input name="lrHigh" type="number" min="0.000000001" step="any" required></label></div>
+<label>Why these likelihoods?<textarea name="rationale" required minlength="20" maxlength="4000" rows="2" placeholder="How expected is this observation if the claim is true, versus false?"></textarea></label>
+<label>Independence rationale <span class="optional">required for a new cluster</span><textarea name="independenceRationale" minlength="30" maxlength="4000" rows="2" placeholder="Explain why it is not another report of the same event or dataset."></textarea></label>
+<p id="evidence-error" role="alert" class="error-text"></p><button class="primary" type="submit">Save evidence and recompute <span aria-hidden="true">↗</span></button></form></dialog>
+<dialog id="login-dialog" aria-labelledby="login-title"><h2 id="login-title">Private research workspace</h2><p class="muted">Enter this server’s access token. Model API keys stay on the server.</p><form id="login-form" class="stack"><label>Access token<input name="token" type="password" required minlength="24" autocomplete="current-password"></label><p id="login-error" role="alert" class="error-text"></p><button class="primary">Open workspace</button></form></dialog>
+<noscript><p>This research workspace needs JavaScript. It never substitutes a static probability for a live assessment.</p></noscript>
+<footer class="site-footer"><span>Independent thinking. Inspectable assumptions.</span><span>Research preview · calibration not yet established</span></footer>
+</body></html>

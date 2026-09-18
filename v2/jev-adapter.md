@@ -1,35 +1,13 @@
-# Jev adapter boundary
+# Jev integration — implemented boundary
 
-Jev should make **small semantic judgments over shared evidence**, quickly. It does not own the world model.
+`JevProvider` in `providers.mjs` uses the documented POST `https://api.typesafe.ai/v1/systemone` contract with pinned `jev-1.13.0` by default. The request contains a state packet and a `noul` relevance question. The response's model version and answer distribution are validated. Keys stay server-side.
 
-## Tasks
+The implemented task asks whether the packet directly measures/documents the specified proposition. Its probability is stored with model version, exact question, source IDs, timestamp, and calibration status. It is **not** the truth probability, a likelihood ratio, independent corroboration, or proof of source accuracy. A Jev failure is visible and does not silently invent a result.
 
-**Relevance:** Does passage S bear directly on atomic claim A?
+Support/contradiction classification, measurement-fit rubrics, semantic duplicate proposals, and learned judgment-to-likelihood mappings remain benchmark-gated work. Do not represent these as implemented just because they appeared in the original design document.
 
-**Direction:** Conditional on S being accurate, is its relationship to A: supports / contradicts / mixed / unresolved?
+The main research model currently elicits disclosed priors and joint likelihood ranges. They are not empirically calibrated. The evaluation harness in `evaluate.mjs` can measure supplied reviewed predictions; it does not train a calibrator or create ground truth.
 
-**Measurement fit:** Does the source measure the outcome named in the claim contract?
-
-**Duplicate/correlation candidate:** Are sources A and B reporting the same underlying observation, dataset, study, witness, or event? This proposes a cluster; deterministic code performs the collapse.
-
-## Stored envelope
-
-Store provider, pinned model version, adapter version, exact question, answer distribution, source IDs + exact spans, and timestamp.
-
-## Do not do
-
-- Do not ask Jev for the final probability of an entire controversy and call it the posterior.
-- Do not treat raw Jev confidence as an LR.
-- Do not ask arithmetic/complement questions code can derive.
-- Do not paraphrase the same evidence ten ways and count the answers as independent.
-
-## Judgment → likelihood
-
-V2 starts conservatively:
-
-1. Jev classifies relevance and qualitative direction.
-2. A mapping from judgment features to LR is learned only after a benchmark exists.
-3. Until then, LR values remain explicit elicited ranges with provenance.
-4. The UI distinguishes model-classified evidence from empirically calibrated likelihoods.
-
-Never use a moving model alias for reproducibility-critical assessments. Pin the evaluated version and rerun calibration before upgrading.
+Official references checked during implementation:
+- https://docs.typesafe.ai/api
+- https://docs.typesafe.ai/models
