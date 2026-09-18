@@ -4,9 +4,9 @@ Private beta, not production certification or a claim of calibrated model accura
 
 ## Executed checks
 
-- **223 automated Node tests pass** at the harness-agnostic revision. The earlier Probability Lab revision had 213; the added coverage validates the generic command/HTTP bridge protocol, strict returned-schema checks, Codex/Claude/Gemini wrapper adaptation with fake CLIs, and per-run orchestrator/grunt routing. No failures, skips or cancellations.
+- **225 automated Node tests pass** at the harness-agnostic revision. The earlier Probability Lab revision had 213; the added coverage validates the generic command/HTTP bridge protocol, strict returned-schema checks, Codex/Claude/Gemini wrapper adaptation with fake CLIs, per-run orchestrator/grunt routing, and Probability Lab scoring through a grunt agent with Jev explicitly unavailable. No failures, skips or cancellations.
 - All JavaScript modules parse; both browser entrypoints are checked for CDN dependencies.
-- The full 223-test suite passes in the isolated Mac checkout on Node.js 24.14.1. An earlier 213-test rerun found and fixed a test synchronization race: a saved preparation may precede job cleanup, so the integration test now waits for the job to finish before asserting dispatch approval behavior. Simulation capacity is rechecked after reading its request body.
+- The full 225-test suite passes in the isolated Mac checkout on Node.js 24.14.1. An earlier 213-test rerun found and fixed a test synchronization race: a saved preparation may precede job cleanup, so the integration test now waits for the job to finish before asserting dispatch approval behavior. Simulation capacity is rechecked after reading its request body.
 - Eight sandbox Chromium workflow checks passed with zero page errors. Actual application code used fetch/history test hooks forwarding to a real local HTTP service and SQLite, not canned API results. Desktop 1440×1050 and mobile 390×844 layouts had no horizontal document overflow.
 
 The UI checks created/completed 1,000 fictional estimates, exercised cursor pagination, inspected stored packet/request/response/attempt traces, disclosed review coverage, verified complete ledger export, and checked the original research homepage's mobile lab link.
@@ -33,6 +33,6 @@ Pinned Noul request/response contracts; exact answer-set and probability validat
 
 ## Not established
 
-No credentialed live OpenAI/Codex/Claude/Gemini/Antigravity/Jev inference call, actual provider latency/cost measurement, held-out factual benchmark, fitted calibration model, equal-budget accuracy comparison, independent security audit or multi-tenant certification ran. The harness wrappers were contract-tested with fake CLI executables; that proves protocol adaptation, not vendor authentication or model quality. Synthetic throughput is not evidence of judgment quality.
+No credentialed live OpenAI/Codex/Claude/Gemini/Antigravity/Jev inference call, actual provider latency/cost measurement, held-out factual benchmark, fitted calibration model, equal-budget accuracy comparison, independent security audit or multi-tenant certification ran. The harness wrappers were contract-tested with fake CLI executables; that proves protocol adaptation, not vendor authentication or model quality. The no-Jev tests use deterministic injected grunt providers and prove routing, persistence, cache and abstention semantics—not real model quality. Synthetic throughput is not evidence of judgment quality.
 
 Guided preparation remains bounded by saved evidence windows and worker budgets. Bulk capacity does not mean every topic automatically generates 100,000 grounded assumptions. Final composition needs an explicit reviewed graph and does not replace the canonical assessment automatically. Root-sensitive active research allocation, semantic dependence validation, disk/cache garbage collection, provider compatibility and production operations remain release gates.

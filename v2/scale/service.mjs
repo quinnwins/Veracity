@@ -1,9 +1,10 @@
 import {join} from 'node:path';
 import {once} from 'node:events';
 import {AuditError, requireThat} from '../engine.mjs';
+import {RunBudget} from '../providers.mjs';
 import {auditHash} from '../store.mjs';
 import {ScaleStore} from './store.mjs';
-import {runCampaign, JevBatchClient} from './runner.mjs';
+import {runCampaign, JevBatchClient, AgentProbabilityClient} from './runner.mjs';
 import {prepareCampaign, tierProviders} from './prepare.mjs';
 import {createAgentRegistry} from '../agents.mjs';
 import {syntheticManifest, SyntheticClient} from './synthetic.mjs';
@@ -17,13 +18,32 @@ export class ScaleService {
     this.clientFactory = clientFactory; this.jobs = new Map(); this.preparations = new Map(); this.closing = false; this.pending = false; this.exporting = new Set();
   }
   async init() { this.store = await new ScaleStore(join(this.directory, 'probability-scale')).init(); return this; }
+  probabilityClient(id, selectedProviders = null) {
+    const jev = this.clientFactory();
+    if (id === 'jev' || (!id && jev.configured)) {
+      jev.descriptor = {kind: 'jev', id: 'jev', name: 'Jev', driver: 'typesafe', model: jev.model};
+      return jev;
+    }
+    let name = typeof id === 'string' && id.startsWith('agent:') ? id.slice(6) : null;
+    if (!name) name = selectedProviders?.workerName || selectedProviders?.worker?.name || this.agentRegistry.publicConfig().defaults.worker;
+    requireThat(name, 'Choose a probability estimator', 'PROVIDER_UNCONFIGURED', 503);
+    const provider = this.agentRegistry.create(name, {role: 'probability-worker', budget: new RunBudget({maxCalls: 12000, maxTokens: 100000000})});
+    return new AgentProbabilityClient({provider, agentName: name});
+  }
   config() {
-    const p = this.providers(), c = this.clientFactory();
+    const p = this.providers(), c = this.clientFactory(), agents = this.agentRegistry?.publicConfig?.() || null;
+    const probabilityEstimators = [
+      ...(c.configured ? [{id: 'jev', name: 'Jev', kind: 'jev', driver: 'typesafe', model: c.model, configured: true}] : []),
+      ...((agents?.agents || []).filter(a => a.configured).map(a => ({id: `agent:${a.name}`, name: a.name, kind: 'agent', driver: a.driver, model: a.model, configured: true})))
+    ];
+    const workerDefault = p.workerName || p.worker.name;
+    const defaultProbabilityEstimator = probabilityEstimators.find(x => x.id === `agent:${workerDefault}`)?.id || probabilityEstimators[0]?.id || null;
     return {orchestrator: {name: p.orchestratorName || p.orchestrator.name || null, model: p.orchestrator.model || null, driver: p.orchestrator.driver || 'openai', configured: p.orchestrator.configured},
       worker: {name: p.workerName || p.worker.name || null, model: p.worker.model || null, driver: p.worker.driver || 'openai', configured: p.worker.configured},
-      agents: this.agentRegistry?.publicConfig?.() || null,
+      agents, probabilityEstimators, defaultProbabilityEstimator,
       jev: {model: c.model, configured: c.configured}, maxQuestions: 100000, activeJobs: this.jobs.size,
-      calibration: 'not-evaluated', deployment: 'Single process, private SQLite workspace', costScope: 'Jev preview excludes planning and review; byte reservations are not a guaranteed invoice cap'};
+      calibration: 'not-evaluated', deployment: 'Single process, private SQLite workspace',
+      costScope: 'Jev cost can be previewed; harness/API agent scoring cost is controlled by that harness/provider and is not estimated by Veracity'};
   }
   capacity() { requireThat(!this.closing && !this.pending && this.jobs.size === 0 && this.exporting.size === 0, 'One scale operation can run at a time', 'BUSY', 429); }
   track(id, work) {
@@ -41,7 +61,9 @@ export class ScaleService {
     if (existing) { requireThat(existing.requestFingerprint === fingerprint, 'Idempotency key reused with different input', 'IDEMPOTENCY_CONFLICT', 409); return {preparationId: existing.id}; }
     requireThat(Number.isInteger(b.maxQuestions) && b.maxQuestions > 0 && b.maxQuestions <= 100000, 'Invalid question limit');
     this.capacity(); const providers = this.providers({orchestratorAgent: b.orchestratorAgent, workerAgent: b.workerAgent});
-    requireThat(providers.orchestrator.configured && providers.worker.configured && this.clientFactory().configured, 'Configure orchestrator, worker and Jev providers first', 'PROVIDER_UNCONFIGURED', 503);
+    requireThat(providers.orchestrator.configured && providers.worker.configured, 'Configure orchestrator and worker providers first', 'PROVIDER_UNCONFIGURED', 503);
+    const probability = this.probabilityClient(b.probabilityEstimator, providers);
+    requireThat(probability.configured, 'Configure the selected probability estimator', 'PROVIDER_UNCONFIGURED', 503);
     this.pending = true;
     try {
       requireThat(this.store.list().length < 30 && (await this.audits.list()).length < 200, 'Research retention limit reached', 'RETENTION_LIMIT', 409);
@@ -53,8 +75,11 @@ export class ScaleService {
         const update = async fields => { const r = await this.audits.get(record.id); return this.audits.update(r.id, r.revision, a => ({...a, ...fields})); };
         try {
           const manifest = await prepareCampaign(parent, {...providers, maxQuestions: b.maxQuestions, signal, onProgress: stage => update({stage})});
-          signal.throwIfAborted(); const campaign = this.store.create({...manifest, limits: {maxQuestions: b.maxQuestions}});
-          await update({status: 'scale-planned', stage: 'Probability study planned; review the Jev dispatch estimate before starting', campaignId: campaign.id, preparationUsage: manifest.plan.usage});
+          signal.throwIfAborted();
+          const campaign = this.store.create({...manifest, model: probability.model, namespace: probability.namespace, estimator: probability.descriptor,
+            limits: {maxQuestions: b.maxQuestions}});
+          await update({status: 'scale-planned', stage: `Probability study planned with ${probability.descriptor?.name || probability.model}; review the dispatch before starting`,
+            campaignId: campaign.id, probabilityEstimator: probability.descriptor, preparationUsage: manifest.plan.usage});
         } catch (e) { await update({status: signal.aborted ? 'cancelled' : 'failed', stage: 'Study preparation stopped', error: e instanceof AuditError ? e.message : 'Preparation failed; inspect provider configuration', preparationUsage: {orchestrator: providers.orchestrator.budget?.snapshot(), worker: providers.worker.budget?.snapshot()}}); }
       });
       return {preparationId: record.id};
@@ -107,8 +132,9 @@ export class ScaleService {
     this.capacity();
     if (action === 'start') {
       requireThat(b.planHash === run.planHash && ['planned','paused','interrupted'].includes(run.status), 'Reload the saved plan before starting', 'REVISION_CONFLICT', 409);
-      requireThat(run.simulation || b.approvePaid === true, 'Explicitly approve this saved plan before paid Jev inference', 'APPROVAL_REQUIRED', 422);
-      const client = run.simulation ? new SyntheticClient() : this.clientFactory(); requireThat(client.configured, 'Configure TYPESAFE_API_KEY', 'PROVIDER_UNCONFIGURED', 503);
+      requireThat(run.simulation || b.approvePaid === true, 'Explicitly approve this saved plan before external probability inference', 'APPROVAL_REQUIRED', 422);
+      const client = run.simulation ? new SyntheticClient() : this.probabilityClient(run.estimator?.id);
+      requireThat(client.configured, 'Configure the selected probability estimator', 'PROVIDER_UNCONFIGURED', 503);
       this.track(id, signal => runCampaign(this.store, id, {client, signal, planHash: b.planHash})); json(res, 202, {id, status: 'starting'}); return true;
     }
     if (action === 'review') {

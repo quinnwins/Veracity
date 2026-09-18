@@ -2,7 +2,7 @@
 
 ## Executed
 
-- The original private-beta engine passed **147 automated tests** on Node.js 22.16.0. The current harness-agnostic revision passes **223 automated tests** with zero failures/skips/cancellations on the connected Mac (Node 24.14.1).
+- The original private-beta engine passed **147 automated tests** on Node.js 22.16.0. The current harness-agnostic revision passes **225 automated tests** with zero failures/skips/cancellations on the connected Mac (Node 24.14.1).
 - `npm run check` parsed all JavaScript modules and checked the browser entrypoint for CDN dependencies.
 - **Seven offline Chromium workflow checks passed**, zero JavaScript page errors, at desktop 1440×1000 and mobile 390×844.
 - Desktop and mobile screenshots were rendered and visually inspected. Neither tested layout had document-level horizontal overflow.
@@ -23,4 +23,4 @@ No external model API was called with live credentials. No live latency, cost, f
 
 ## Probability Lab extension
 
-The completed Probability Lab extension originally passed 213 automated tests. The current harness-agnostic extension passes 223, adding bridge/schema and per-run agent-routing coverage. Eight sandbox browser checks and a three-pass 100k synthetic load test are recorded in `scale/QA_REPORT.md`. Native browser transport and live credentialed OpenAI/Codex/Claude/Gemini/Antigravity/Jev inference remain unverified.
+The completed Probability Lab extension originally passed 213 automated tests. The current harness-agnostic/no-Jev extension passes 225, adding bridge/schema, per-run agent routing, and a no-TypeSafe grunt-probability backend with explicit abstention coverage. Eight sandbox browser checks and a three-pass 100k synthetic load test are recorded in `scale/QA_REPORT.md`. Native browser transport and live credentialed OpenAI/Codex/Claude/Gemini/Antigravity/Jev inference remain unverified.

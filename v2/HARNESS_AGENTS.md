@@ -7,7 +7,7 @@ The two reasoning roles are named:
 - **orchestrator** — decomposition, hidden-assumption review, probability-model elicitation, adversarial review, Probability Lab planning/review.
 - **worker** — repetitive source search and source-linked atomic-question extraction.
 
-Jev remains a separate probability-estimation tier.
+The probability tier can be Jev **or another configured harness/API agent**. Jev is optional.
 
 ## Select agents
 
@@ -110,8 +110,8 @@ This is the escape hatch for **any harness**: if it can receive a JSON task and 
 
 Examples:
 
-- Codex subscription orchestrator + Gemini CLI worker + Jev.
-- Claude Code orchestrator + cheap OpenAI API worker + Jev.
+- Codex subscription orchestrator + Gemini CLI worker + **Gemini probability estimator** (no Jev).
+- Claude Code orchestrator + cheap OpenAI API worker + **Claude/worker probability estimator** (no Jev).
 - Direct OpenAI orchestrator + Claude Code worker + Jev.
 - Antigravity bridge orchestrator + Gemini CLI worker + Jev.
 - Custom local model bridge for grunt work + Codex orchestrator + Jev.
@@ -125,3 +125,7 @@ Agent outputs are untrusted.
 Veracity still performs its own graph validation, quote checking, probability validation, source fetching, dependence checks and deterministic math after a harness returns.
 
 A harness is therefore an interchangeable reasoning component, not a trusted database or probability engine.
+
+## No Jev access required
+
+Probability Lab exposes a separate probability-estimator selector. Choose `agent:<name>` to reuse any configured grunt/harness agent for batched structured JSON probabilities. The agent may abstain when the saved evidence does not support a defensible estimate; abstentions are stored explicitly and never coerced to 50%. Jev can be added later without changing the campaign/ledger architecture.

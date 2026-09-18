@@ -56,7 +56,7 @@ Definitions and value choices are separated from empirical claims. Political/ele
 ## Evaluation and verification
 
 ```sh
-npm test                  # 223 automated tests at the harness-agnostic revision
+npm test                  # 225 automated tests at the no-Jev-capable revision
 npm run check             # Parse every JS module; check no CDN entrypoint dependency
 node evaluate.mjs reviewed-predictions.jsonl
 ```
@@ -90,8 +90,8 @@ Provider contracts checked against official documentation:
 - https://docs.typesafe.ai/api
 - https://docs.typesafe.ai/models
 
-## Probability Lab: strong orchestration, cheaper workers, Jev breadth
+## Probability Lab: strong orchestration, cheaper workers, probability breadth
 
 Open `/scale` from the new Probability lab header link. The durable ledger supports up to 100,000 validated local questions, exact-context batching/cache reuse, persistent attempts/budgets, pause/resume, selective stronger-model review and an explicit reviewed-estimate composition API. Guided source expansion is bounded; it does not manufacture 100,000 assumptions from each topic.
 
-Select an orchestrator and grunt agent through `agents.json` / the browser (direct OpenAI API models remain the backwards-compatible default), then configure `TYPESAFE_API_KEY` for live Jev scoring. No-key synthetic simulations exercise the real queue/store. `npm run scale:bench -- --count 100000` reproduces the synthetic cold/cache/changed-packet load test. Read `HARNESS_AGENTS.md`, `scale/README.md`, and `scale/QA_REPORT.md` for contracts, executed verification, and remaining gates. No real factual calibration is claimed.
+Select an orchestrator and grunt agent through `agents.json` / the browser (direct OpenAI API models remain the backwards-compatible default), then choose a probability estimator. Jev is optional: with no TypeSafe key, any configured grunt/harness agent can produce structured JSON probabilities. No-key synthetic simulations exercise the real queue/store. `npm run scale:bench -- --count 100000` reproduces the synthetic cold/cache/changed-packet load test. Read `HARNESS_AGENTS.md`, `scale/README.md`, and `scale/QA_REPORT.md` for contracts, executed verification, and remaining gates. No real factual calibration is claimed.

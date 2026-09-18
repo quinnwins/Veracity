@@ -151,7 +151,7 @@ export async function createApplication({directory = process.env.VERACITY_DATA_D
       }
       requireThat(authorized, 'Enter the server access token', 'UNAUTHORIZED', 401);
       if (await scale.handle(req, res, url, {body, json})) return;
-      if (path === '/api/config' && req.method === 'GET') return json(res, 200, {version: '2.0.0-beta.3', researchConfigured: configured === undefined ? defaultResearchConfigured() : configured, agents: publicAgents(), jevConfigured: Boolean(process.env.TYPESAFE_API_KEY), activeRuns: running.size, localOnly: local, calibration: 'not-evaluated'});
+      if (path === '/api/config' && req.method === 'GET') return json(res, 200, {version: '2.0.0-beta.4', researchConfigured: configured === undefined ? defaultResearchConfigured() : configured, agents: publicAgents(), jevConfigured: Boolean(process.env.TYPESAFE_API_KEY), activeRuns: running.size, localOnly: local, calibration: 'not-evaluated'});
       if (path === '/api/assessments' && req.method === 'GET') return json(res, 200, {assessments: (await store.list()).map(a => ({id: a.id, question: a.question, status: a.status, kind: a.kind, updatedAt: a.updatedAt, parentId: a.parentId || null, range: a.analysis?.root.range || null}))});
       if (path === '/api/assessments' && req.method === 'POST') return json(res, 202, await newResearch(await body(req), req.headers['idempotency-key']));
       if (path === '/api/demo' && req.method === 'POST') {

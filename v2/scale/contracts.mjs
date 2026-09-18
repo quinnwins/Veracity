@@ -2,7 +2,7 @@ import {AuditError, requireThat, probability} from '../engine.mjs';
 import {auditHash, canonicalJSON} from '../store.mjs';
 import {digest} from '../evidence.mjs';
 
-export const SCALE_VERSION = '1.0.0-beta.1';
+export const SCALE_VERSION = '1.1.0-beta.1';
 export const PROMPT_VERSION = 'atomic-estimate-1';
 export const DEFAULTS = Object.freeze({maxQuestions: 100000, batchSize: 32, concurrency: 4,
   maxRequests: 12000, maxInputUnits: 100000000, maxJevUSD: 5, inputUSDPerMillion: .042,
@@ -75,7 +75,8 @@ export function questionShape(t) {
     criteria: {true: t.q.yes, false: t.q.no}};
 }
 export function makeBody(model, p, questions) {
-  requireThat(/^jev-\d+\.\d+\.\d+$/.test(model), 'Pin the Jev model version');
+  requireThat(typeof model === 'string' && model.length >= 3 && model.length <= 240 && !/[\r\n\0]/.test(model), 'Pin a stable probability-estimator identity');
+  if (model.startsWith('jev-')) requireThat(/^jev-\d+\.\d+\.\d+$/.test(model), 'Pin the Jev model version');
   const body = {model, state: p.state, questions: Object.fromEntries(questions.map(t => [t.id, questionShape(t)]))};
   requireThat(questions.length >= 1 && questions.length <= 64 && Object.keys(body.questions).length === questions.length, 'Invalid batch size or duplicate questions');
   const stateBytes = Buffer.byteLength(canonicalJSON(body.state));
@@ -85,10 +86,16 @@ export function makeBody(model, p, questions) {
   return {body, units};
 }
 export function validateResponse(r, body) {
-  requireThat(r?.model === body.model, 'Jev returned a different model version', 'PROVIDER_VERSION', 502);
+  requireThat(r?.model === body.model, 'Probability provider returned a different estimator identity', 'PROVIDER_VERSION', 502);
   const keys = Object.keys(body.questions);
-  requireThat(r.answers && typeof r.answers === 'object' && Object.keys(r.answers).length === keys.length && keys.every(k => Object.hasOwn(r.answers, k)), 'Incomplete or unexpected Jev answers; whole batch withheld', 'PROVIDER_FORMAT', 502);
-  for (const k of keys) { requireThat(r.answers[k]?.type === 'noul', 'Expected a Noul answer', 'PROVIDER_FORMAT', 502); probability(r.answers[k].noul); }
-  requireThat(Number.isSafeInteger(r.usage?.input_tokens) && r.usage.input_tokens >= 0 && Number.isSafeInteger(r.usage.output_tokens) && r.usage.output_tokens >= 0, 'Jev usage is missing or malformed', 'PROVIDER_FORMAT', 502);
+  requireThat(r.answers && typeof r.answers === 'object' && Object.keys(r.answers).length === keys.length && keys.every(k => Object.hasOwn(r.answers, k)), 'Incomplete or unexpected probability answers; whole batch withheld', 'PROVIDER_FORMAT', 502);
+  for (const k of keys) {
+    const a = r.answers[k];
+    if (a?.type === 'noul') probability(a.noul);
+    else if (a?.type === 'abstain') requireThat(typeof a.reason === 'string' && a.reason.trim().length >= 8 && a.reason.length <= 1200, 'Abstention needs a substantive reason', 'PROVIDER_FORMAT', 502);
+    else requireThat(false, 'Expected a probability estimate or abstention', 'PROVIDER_FORMAT', 502);
+  }
+  if (r.provider === 'agent' && (r.usage === null || r.usage === undefined)) return r;
+  requireThat(Number.isSafeInteger(r.usage?.input_tokens) && r.usage.input_tokens >= 0 && Number.isSafeInteger(r.usage.output_tokens) && r.usage.output_tokens >= 0, 'Provider usage is missing or malformed', 'PROVIDER_FORMAT', 502);
   return r;
 }

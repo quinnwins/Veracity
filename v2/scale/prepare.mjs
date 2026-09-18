@@ -77,7 +77,7 @@ export async function prepareCampaign(assessment, {orchestrator, worker, orchest
     } catch (e) { signal?.throwIfAborted(); gaps.push(`Source window ${p.id} not accepted: ${e instanceof AuditError ? e.message : 'worker failed'}`); }
   }
   requireThat(tasks.length > 0, 'No grounded atomic questions survived worker validation', 'NO_CANDIDATES', 422);
-  return {contract, packets: used, tasks, model: process.env.JEV_MODEL || 'jev-1.13.0', simulation: false,
+  return {contract, packets: used, tasks, simulation: false,
     parent: {id: assessment.id, revision: assessment.revision, modelHash: auditHash(assessment.model)},
     plan: {workstreams: plan.workstreams, gaps, sourceWindows: used.map(p => p.window),
       requestedLimit: maxQuestions, actualCandidates: tasks.length, enumerationComplete: false,

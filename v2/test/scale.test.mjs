@@ -7,7 +7,7 @@ import {auditHash, canonicalJSON} from '../store.mjs';
 import {digest} from '../evidence.mjs';
 import {options, packet, question, validateContract, makeBody, validateResponse} from '../scale/contracts.mjs';
 import {ScaleStore} from '../scale/store.mjs';
-import {runCampaign, JevBatchClient, retryDelay, RateGate} from '../scale/runner.mjs';
+import {runCampaign, JevBatchClient, AgentProbabilityClient, retryDelay, RateGate} from '../scale/runner.mjs';
 import {syntheticManifest, SyntheticClient} from '../scale/synthetic.mjs';
 import {selectReview, reviewCampaign} from '../scale/review.mjs';
 import {composeReviewed} from '../scale/compose.mjs';
@@ -39,6 +39,26 @@ test('batch exceeding per-second dispatch allocation fails closed',async()=>{con
 test('Jev real adapter sends multi-question Noul and no key in JSON',async()=>{const{q,p}=one();const{body}=makeBody('jev-1.13.0',p,[q]);let sent;const c=new JevBatchClient({key:'secret-not-a-real-key',fetchImpl:async(url,r)=>{sent={url,...r};return new Response(JSON.stringify(response(body)),{headers:{'x-request-id':'req1'}});}});const r=await c.send(body,{timeoutMs:1000});assert.equal(r.requestId,'req1');assert.equal(sent.headers.Authorization,'Bearer secret-not-a-real-key');assert.equal(sent.body.includes('secret-not-a-real-key'),false);assert.equal(sent.redirect,'error');});
 test('TypeSafe 529 is retryable',async()=>{const c=new JevBatchClient({key:'x',fetchImpl:async()=>new Response('overloaded',{status:529,headers:{'retry-after':'2'}})});await assert.rejects(c.send({model:c.model},{timeoutMs:1000}),e=>e.retryable&&e.retryAfter==='2');});
 test('TypeSafe auth failure is not automatically retried',async()=>{const c=new JevBatchClient({key:'x',fetchImpl:async()=>new Response('bad key',{status:401})});await assert.rejects(c.send({model:c.model},{timeoutMs:1000}),e=>e.retryable===false);});
+
+test('grunt agent can replace Jev for JSON probabilities and preserve abstention',async t=>{
+  const s=await fixture(t),m=syntheticManifest(2);m.tasks=[...m.tasks];
+  for(const p of m.packets)for(const source of p.sources)source.origin='user-provided';
+  m.simulation=false;
+  const provider={configured:true,name:'grunt-fixture',model:'cheap-json-model',driver:'command',structured:async(_task,_instructions,input)=>{
+    const ids=Object.keys(input.questions), abstain=input.state.passages[0].text.includes('PACKET 1');
+    return {answers:Object.fromEntries(ids.map(id=>[id,abstain?{probability:.5,abstain:true,reason:'The supplied passage is insufficient to resolve this proposition.'}:{probability:.73,abstain:false,reason:'The supplied passage directly supports this scoped proposition.'}]))};
+  }};
+  const client=new AgentProbabilityClient({provider,agentName:'grunt-fixture'});
+  const r=s.create({...m,model:client.model,namespace:client.namespace,estimator:client.descriptor});
+  const done=await runCampaign(s,r.id,{client,planHash:r.planHash});
+  assert.equal(done.estimator.kind,'agent');assert.equal(done.counts.completed,1);assert.equal(done.counts.abstained,1);assert.equal(done.status,'partial');
+  const items=s.page(r.id).items;assert.equal(items[0].probability,.73);assert.equal(items[1].probability,null);assert.match(items[1].review.reason,/insufficient/);
+  const secondClient=new AgentProbabilityClient({provider,agentName:'grunt-fixture'});
+  const rerun=s.create({...m,model:secondClient.model,namespace:secondClient.namespace,estimator:secondClient.descriptor});
+  const cached=await runCampaign(s,rerun.id,{client:secondClient,planHash:rerun.planHash});
+  assert.equal(cached.cacheHits,2);assert.equal(cached.usage.requests,0);
+});
+
 test('manifest rejects synthetic evidence in a live campaign',async t=>{const s=await fixture(t);assert.throws(()=>s.create({...syntheticManifest(1),simulation:false}),/Synthetic/);});
 test('1000 tasks actually batch, persist, page, and rerun through cache',async t=>{const s=await fixture(t);const r=s.create(syntheticManifest(1000));const c=new SyntheticClient();const done=await runCampaign(s,r.id,{client:c,planHash:r.planHash});assert.equal(done.counts.completed,1000);assert.equal(done.status,'completed');assert.equal(c.calls,100);const p=s.page(r.id,{limit:7});assert.equal(p.items.length,7);assert.equal(p.next,6);assert.equal(s.page(r.id,{after:p.next,limit:7}).items[0].seq,7);const fresh=s.create(syntheticManifest(1000));const client=new SyntheticClient();const cached=await runCampaign(s,fresh.id,{client,planHash:fresh.planHash});assert.equal(client.calls,0);assert.equal(cached.cacheHits,100);assert.equal(cached.usage.requests,0);});
 test('one changed packet invalidates only affected batches',async t=>{const s=await fixture(t);let r=s.create(syntheticManifest(1000));await runCampaign(s,r.id,{client:new SyntheticClient(),planHash:r.planHash});r=s.create(syntheticManifest(1000,0));const c=new SyntheticClient();await runCampaign(s,r.id,{client:c,planHash:r.planHash});assert.equal(c.calls,1);});

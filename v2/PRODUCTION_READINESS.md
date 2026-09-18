@@ -24,6 +24,6 @@ Label machine-elicited numbers as uncalibrated, state the assessed reading, disc
 
 ## Three-tier Probability Lab
 
-Implemented: strong/cheap model roles, source-grounded question extraction, pinned Jev Noul batching, durable SQLite attempts/caching, explicit spending approval, cancellation/resumption, selective review and reviewed-estimate composition. See `scale/QA_REPORT.md`.
+Implemented: strong/cheap model roles, source-grounded question extraction, optional pinned Jev Noul batching **or grunt/harness JSON probability scoring**, durable SQLite attempts/caching, explicit dispatch approval, cancellation/resumption, selective review and reviewed-estimate composition. Jev is not required. See `scale/QA_REPORT.md`.
 
 Remaining gates include live provider compatibility, held-out factual calibration and equal-budget quality comparison, native browser networking verification, disk/cache quotas and garbage collection, independent security review and production operations. The private single-writer 100k ledger is not a multi-tenant distributed service.
