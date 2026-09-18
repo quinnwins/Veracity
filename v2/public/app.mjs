@@ -12,9 +12,14 @@ async function api(path, body, extra = {}) {
   return data;
 }
 function notice(message) { const n = $('#notice'); n.textContent = message; n.hidden = false; clearTimeout(noticeTimer); noticeTimer = setTimeout(() => { n.hidden = true; }, 7000); }
+function agentOptions(role) {
+  const all=config?.agents?.agents||[], agents=role==='worker'?all.filter(a=>a.capabilities?.search===true):all;
+  const preferred=config?.agents?.defaults?.[role], chosen=agents.find(a=>a.name===preferred&&a.configured)?.name||agents.find(a=>a.configured)?.name;
+  return agents.map(a=>`<option value="${esc(a.name)}" ${a.name===chosen?'selected':''} ${a.configured?'':'disabled'}>${esc(a.name)} · ${esc(a.driver)}${a.model?' · '+esc(a.model):''}${a.configured?'':' · not configured'}</option>`).join('');
+}
 function goHome() { clearTimeout(poll); record = null; selected = null; history.replaceState(null, '', '/'); renderHome(); }
 function renderHome() {
-  $('#main').innerHTML = `<section class="landing"><div><div class="eyebrow">Evidence / assumptions / uncertainty</div><h1>A clearer answer starts with better questions.</h1><p class="lead">Take a claim apart. Examine the evidence. Find the assumption that could change the answer.</p><form id="ask-form"><div class="question-box"><label for="question">What are you trying to figure out?</label><textarea id="question" name="question" placeholder="Write the claim you want to investigate…" required minlength="8" maxlength="2000" rows="3"></textarea><div class="question-bottom"><small>${config?.researchConfigured ? 'Live research uses your configured model providers.' : 'Live research needs server-side provider keys.'}</small><button class="primary" type="submit">Investigate claim <span aria-hidden="true">↗</span></button></div></div><p id="ask-error" role="alert" class="error-text"></p></form><button class="demo-link" id="demo-button">Explore a worked example <span>FICTIONAL · NO API KEY</span><b aria-hidden="true">→</b></button></div><aside class="protocol"><div class="eyebrow">The research protocol</div><h2>Show what the answer rests on.</h2><ol><li><div><strong>Define the claim</strong><p>Separate the exact question from its stronger or weaker readings.</p></div></li><li><div><strong>Expose assumptions</strong><p>Break the argument down to measurable questions.</p></div></li><li><div><strong>Challenge the evidence</strong><p>Look for contrary findings and shared underlying sources.</p></div></li><li><div><strong>Test the answer</strong><p>Change an input. See what moves—and what does not.</p></div></li></ol><div class="principle">A number is only as useful as the assumptions you can inspect.</div></aside></section>`;
+  $('#main').innerHTML = `<section class="landing"><div><div class="eyebrow">Evidence / assumptions / uncertainty</div><h1>A clearer answer starts with better questions.</h1><p class="lead">Take a claim apart. Examine the evidence. Find the assumption that could change the answer.</p><form id="ask-form"><div class="question-box"><label for="question">What are you trying to figure out?</label><textarea id="question" name="question" placeholder="Write the claim you want to investigate…" required minlength="8" maxlength="2000" rows="3"></textarea><div class="form-pair"><label>Orchestrator<select name="orchestratorAgent" required>${agentOptions('orchestrator')}</select><small>Deep decomposition, synthesis and adversarial review.</small></label><label>Grunt / research worker<select name="workerAgent" required>${agentOptions('worker')}</select><small>Source search and repetitive evidence preparation.</small></label></div><div class="question-bottom"><small>${config?.researchConfigured ? 'Choose any configured harness or API agent for each role.' : 'Configure at least one reasoning agent and one search-capable worker.'}</small><button class="primary" type="submit" ${config?.researchConfigured?'':'disabled'}>Investigate claim <span aria-hidden="true">↗</span></button></div></div><p id="ask-error" role="alert" class="error-text"></p></form><button class="demo-link" id="demo-button">Explore a worked example <span>FICTIONAL · NO API KEY</span><b aria-hidden="true">→</b></button></div><aside class="protocol"><div class="eyebrow">The research protocol</div><h2>Show what the answer rests on.</h2><ol><li><div><strong>Define the claim</strong><p>Separate the exact question from its stronger or weaker readings.</p></div></li><li><div><strong>Expose assumptions</strong><p>Break the argument down to measurable questions.</p></div></li><li><div><strong>Challenge the evidence</strong><p>Look for contrary findings and shared underlying sources.</p></div></li><li><div><strong>Test the answer</strong><p>Change an input. See what moves—and what does not.</p></div></li></ol><div class="principle">A number is only as useful as the assumptions you can inspect.</div></aside></section>`;
 }
 function setRecord(a, {focus = true} = {}) {
   clearTimeout(poll); record = a;
@@ -99,7 +104,7 @@ document.addEventListener('submit', async event => {
   try {
     if (form.id === 'ask-form') {
       const question = values.question.trim(); if (lastQuestion !== question) { requestKey = crypto.randomUUID(); lastQuestion = question; }
-      const a = await api('/api/assessments', {question}, {'Idempotency-Key': requestKey}); requestKey = null; lastQuestion = null; setRecord(a);
+      const a = await api('/api/assessments', {question, orchestratorAgent: values.orchestratorAgent, workerAgent: values.workerAgent}, {'Idempotency-Key': requestKey}); requestKey = null; lastQuestion = null; setRecord(a);
     } else if (form.id === 'scenario-form') {
       const overrides = {[selected]: [Number(values.low), Number(values.high)]};
       setRecord(await api(`/api/assessments/${record.id}/scenario`, {expectedRevision: record.revision, overrides})); notice('Saved as a separate scenario. The original is unchanged.');
@@ -112,7 +117,7 @@ document.addEventListener('submit', async event => {
 });
 async function boot() {
   try {
-    config = await api('/api/config'); $('#connection').textContent = config.researchConfigured ? 'Research provider configured' : 'Local workspace · demo available';
+    config = await api('/api/config'); $('#connection').textContent = config.researchConfigured ? 'Research agents configured' : 'Local workspace · demo available';
     const id = new URL(location.href).searchParams.get('audit');
     if (id) { try { setRecord(await api(`/api/assessments/${encodeURIComponent(id)}`)); } catch (e) { goHome(); notice(e.message); } } else renderHome();
   } catch (e) {

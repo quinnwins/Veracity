@@ -15,16 +15,16 @@ npm start
 
 Open `http://127.0.0.1:8787`. Select **Explore a worked example**. Its logs and numerical inputs are clearly labeled fictional. The displayed probability is actually computed. Click an assumption, save a separate what-if scenario, add a quoted observation, inspect version history, and export the complete record.
 
-For live research:
+For live research you can use direct API models **or agent harnesses**:
 
 ```sh
 cp .env.example .env
-# Edit .env with OPENAI_API_KEY and OPENAI_MODEL.
-# TYPESAFE_API_KEY is optional.
+# Direct API mode: configure OPENAI_API_KEY + model variables.
+# Harness mode: cp agents.example.json agents.json and select named agents.
 npm start
 ```
 
-Choose an OpenAI model available to your account that supports the Responses API, strict structured outputs, and web search. Prefer a pinned version. There is deliberately no assumed default model or bundled credential. Keys remain server-side. A missing provider returns a clear error; arbitrary questions never receive the demo's static numbers.
+The orchestrator and grunt/worker are first-class, independently selectable roles. A run may use Codex for orchestration, Claude Code or Gemini CLI for grunt work, a direct API model for either role, or any custom command/HTTP bridge implementing `veracity-agent/v1`. The browser saves the chosen agent names with each run. See `HARNESS_AGENTS.md`. Harnesses use their own authentication/session rules; Veracity does not impersonate API credentials or bypass product limits. A missing provider returns a clear error; arbitrary questions never receive the demo's static numbers.
 
 ## What works
 
@@ -56,7 +56,7 @@ Definitions and value choices are separated from empirical claims. Political/ele
 ## Evaluation and verification
 
 ```sh
-npm test                  # 213 automated tests at the Probability Lab revision
+npm test                  # 223 automated tests at the harness-agnostic revision
 npm run check             # Parse every JS module; check no CDN entrypoint dependency
 node evaluate.mjs reviewed-predictions.jsonl
 ```
@@ -94,4 +94,4 @@ Provider contracts checked against official documentation:
 
 Open `/scale` from the new Probability lab header link. The durable ledger supports up to 100,000 validated local questions, exact-context batching/cache reuse, persistent attempts/budgets, pause/resume, selective stronger-model review and an explicit reviewed-estimate composition API. Guided source expansion is bounded; it does not manufacture 100,000 assumptions from each topic.
 
-Configure `OPENAI_ORCHESTRATOR_MODEL` (or `OPENAI_MODEL` fallback), explicit `OPENAI_WORKER_MODEL`, and `TYPESAFE_API_KEY`. No-key synthetic simulations exercise the real queue/store. `npm run scale:bench -- --count 100000` reproduces the synthetic cold/cache/changed-packet load test. Read `scale/README.md` for API/CLI contracts and `scale/QA_REPORT.md` for executed verification and remaining gates. No real factual calibration is claimed.
+Select an orchestrator and grunt agent through `agents.json` / the browser (direct OpenAI API models remain the backwards-compatible default), then configure `TYPESAFE_API_KEY` for live Jev scoring. No-key synthetic simulations exercise the real queue/store. `npm run scale:bench -- --count 100000` reproduces the synthetic cold/cache/changed-packet load test. Read `HARNESS_AGENTS.md`, `scale/README.md`, and `scale/QA_REPORT.md` for contracts, executed verification, and remaining gates. No real factual calibration is claimed.

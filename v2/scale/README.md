@@ -23,7 +23,7 @@ npm start
 
 Open `http://127.0.0.1:8787/scale`. No-key simulations exercise real storage, batching and caching with 1,000, 10,000 or 100,000 explicitly fictional questions. They make no external calls.
 
-For live work configure server-side `OPENAI_API_KEY`, `OPENAI_ORCHESTRATOR_MODEL`, explicit `OPENAI_WORKER_MODEL`, `TYPESAFE_API_KEY` and pinned `JEV_MODEL=jev-1.13.0`. `OPENAI_MODEL` remains an orchestrator fallback. Use account-supported Responses/structured-output models; source-search workers also need web search. No paid model is silently chosen.
+For live work, select the **orchestrator** and **grunt/worker** independently. Direct OpenAI API models remain supported, but they are no longer required for those roles: Codex, Claude Code, Gemini CLI, an Antigravity/IDE bridge, or any `veracity-agent/v1` command/HTTP adapter can fill either role. Configure `TYPESAFE_API_KEY` and a pinned `JEV_MODEL` separately for the probability tier. See `../HARNESS_AGENTS.md`. Normal live research requires the chosen worker to expose source-search capability; Probability Lab extraction can operate over already-saved evidence without search. No paid model is silently chosen.
 
 Research an empirical question first, then expand its saved evidence in the lab. Preparation spends bounded orchestrator/worker calls. Jev scoring starts only after approving the saved plan and its estimate. Strong-model review needs separate approval. Stopping dispatch does not guarantee in-flight requests are unbilled.
 

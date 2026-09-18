@@ -1,0 +1,47 @@
+{
+  "roles": {
+    "orchestrator": "codex-high",
+    "worker": "claude-worker"
+  },
+  "agents": {
+    "openai-api-high": {
+      "driver": "openai",
+      "modelEnv": "OPENAI_ORCHESTRATOR_MODEL",
+      "fallbackModelEnv": "OPENAI_MODEL"
+    },
+    "openai-api-worker": {
+      "driver": "openai",
+      "modelEnv": "OPENAI_WORKER_MODEL"
+    },
+    "codex-high": {
+      "driver": "command",
+      "command": ["node", "scripts/harness/codex-cli.mjs"],
+      "model": "gpt-5.6-codex",
+      "capabilities": {"search": true}
+    },
+    "claude-worker": {
+      "driver": "command",
+      "command": ["node", "scripts/harness/claude-code.mjs"],
+      "model": "sonnet",
+      "capabilities": {"search": true}
+    },
+    "gemini-worker": {
+      "driver": "command",
+      "command": ["node", "scripts/harness/gemini-cli.mjs"],
+      "model": "gemini-2.5-pro",
+      "capabilities": {"search": true}
+    },
+    "antigravity-bridge": {
+      "driver": "http",
+      "endpoint": "http://127.0.0.1:9911/veracity-agent",
+      "model": "antigravity-selected-agent",
+      "capabilities": {"search": true}
+    },
+    "any-harness": {
+      "driver": "command",
+      "command": ["/absolute/path/to/your-veracity-agent-bridge"],
+      "model": "user-selected-model",
+      "capabilities": {"search": false}
+    }
+  }
+}

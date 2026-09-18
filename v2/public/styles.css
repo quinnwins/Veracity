@@ -190,7 +190,7 @@ p,dd,h1,h2,h3,.node-title{overflow-wrap:anywhere}
 .site-footer span{display:block;margin:4px 0}
 dialog{padding:22px}
 .history-row{gap:12px}
-.form-pair{gap:10px}
+.form-pair{gap:10px;grid-template-columns:1fr}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation:none!important;transition:none!important}
 }

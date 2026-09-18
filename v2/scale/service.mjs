@@ -5,18 +5,24 @@ import {auditHash} from '../store.mjs';
 import {ScaleStore} from './store.mjs';
 import {runCampaign, JevBatchClient} from './runner.mjs';
 import {prepareCampaign, tierProviders} from './prepare.mjs';
+import {createAgentRegistry} from '../agents.mjs';
 import {syntheticManifest, SyntheticClient} from './synthetic.mjs';
 import {selectReview, reviewCampaign} from './review.mjs';
 import {composeReviewed} from './compose.mjs';
 
 export class ScaleService {
-  constructor({directory, audits, providers = tierProviders, clientFactory = () => new JevBatchClient()} = {}) {
-    this.directory = directory; this.audits = audits; this.providers = providers; this.clientFactory = clientFactory; this.jobs = new Map(); this.preparations = new Map(); this.closing = false; this.pending = false; this.exporting = new Set();
+  constructor({directory, audits, providers, agentRegistry = createAgentRegistry(), clientFactory = () => new JevBatchClient()} = {}) {
+    this.directory = directory; this.audits = audits; this.agentRegistry = agentRegistry;
+    this.providers = providers || (selection => tierProviders({...selection, registry: this.agentRegistry}));
+    this.clientFactory = clientFactory; this.jobs = new Map(); this.preparations = new Map(); this.closing = false; this.pending = false; this.exporting = new Set();
   }
   async init() { this.store = await new ScaleStore(join(this.directory, 'probability-scale')).init(); return this; }
   config() {
     const p = this.providers(), c = this.clientFactory();
-    return {orchestrator: {model: p.orchestrator.model || null, configured: p.orchestrator.configured}, worker: {model: p.worker.model || null, configured: p.worker.configured}, jev: {model: c.model, configured: c.configured}, maxQuestions: 100000, activeJobs: this.jobs.size,
+    return {orchestrator: {name: p.orchestratorName || p.orchestrator.name || null, model: p.orchestrator.model || null, driver: p.orchestrator.driver || 'openai', configured: p.orchestrator.configured},
+      worker: {name: p.workerName || p.worker.name || null, model: p.worker.model || null, driver: p.worker.driver || 'openai', configured: p.worker.configured},
+      agents: this.agentRegistry?.publicConfig?.() || null,
+      jev: {model: c.model, configured: c.configured}, maxQuestions: 100000, activeJobs: this.jobs.size,
       calibration: 'not-evaluated', deployment: 'Single process, private SQLite workspace', costScope: 'Jev preview excludes planning and review; byte reservations are not a guaranteed invoice cap'};
   }
   capacity() { requireThat(!this.closing && !this.pending && this.jobs.size === 0 && this.exporting.size === 0, 'One scale operation can run at a time', 'BUSY', 429); }
@@ -34,7 +40,7 @@ export class ScaleService {
     const existing = (await this.audits.list()).find(a => a.scaleRequestKey === key);
     if (existing) { requireThat(existing.requestFingerprint === fingerprint, 'Idempotency key reused with different input', 'IDEMPOTENCY_CONFLICT', 409); return {preparationId: existing.id}; }
     requireThat(Number.isInteger(b.maxQuestions) && b.maxQuestions > 0 && b.maxQuestions <= 100000, 'Invalid question limit');
-    this.capacity(); const providers = this.providers();
+    this.capacity(); const providers = this.providers({orchestratorAgent: b.orchestratorAgent, workerAgent: b.workerAgent});
     requireThat(providers.orchestrator.configured && providers.worker.configured && this.clientFactory().configured, 'Configure orchestrator, worker and Jev providers first', 'PROVIDER_UNCONFIGURED', 503);
     this.pending = true;
     try {
@@ -108,7 +114,7 @@ export class ScaleService {
     if (action === 'review') {
       requireThat(['completed', 'partial'].includes(run.status), 'Finish inference before strong-model review', 'NOT_READY', 409);
       requireThat(!run.simulation && b.approvePaid === true, 'Strong-model review requires an explicitly approved live study', 'APPROVAL_REQUIRED', 422);
-      const {orchestrator} = this.providers(); requireThat(orchestrator.configured, 'Configure the orchestrator', 'PROVIDER_UNCONFIGURED', 503);
+      const {orchestrator} = this.providers({orchestratorAgent: run.plan?.agents?.orchestrator, workerAgent: run.plan?.agents?.worker}); requireThat(orchestrator.configured, 'Configure the orchestrator', 'PROVIDER_UNCONFIGURED', 503);
       this.track(id, async signal => { try { await reviewCampaign(this.store, id, orchestrator, {signal}); }
         finally { const r = this.store.get(id), log = [...r.reviewLog, {at: new Date().toISOString(), role: 'orchestrator', operation: 'review usage', usage: orchestrator.budget?.snapshot?.() || null}]; this.store.sql('UPDATE runs SET review_log=? WHERE id=?').run(JSON.stringify(log), id); } });
       json(res, 202, {id, status: 'reviewing'}); return true;

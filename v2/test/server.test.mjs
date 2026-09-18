@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {mkdtemp,rm} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';
-import {createApplication} from '../server.mjs';import {createDemo} from '../demo.mjs';
+import {createApplication} from '../server.mjs';import {createDemo} from '../demo.mjs';import {AgentRegistry} from '../agents.mjs';
 async function setup(t,opts={}){const dir=await mkdtemp(join(tmpdir(),'veracity-api-'));const app=await createApplication({directory:dir,port:0,configured:false,...opts});const address=await app.listen(),base=`http://127.0.0.1:${address.port}`;t.after(async()=>{await app.close();await rm(dir,{recursive:true,force:true})});const call=async(path,body,headers={})=>{const r=await fetch(base+path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json',Origin:base,...headers},body:body===undefined?undefined:JSON.stringify(body)});return {status:r.status,headers:r.headers,data:await r.json()}};return {app,base,call};}
 test('home is the real app and security headers are present',async t=>{const {base}=await setup(t);const r=await fetch(base);assert.equal(r.status,200);assert.match(await r.text(),/app.mjs/);assert.match(r.headers.get('content-security-policy'),/frame-ancestors 'none'/);assert.equal(r.headers.get('x-content-type-options'),'nosniff')});
 test('missing provider returns 503 and creates no fake assessment',async t=>{const {call}=await setup(t);const r=await call('/api/assessments',{question:'Is this controversial claim true?'});assert.equal(r.status,503);assert.equal(r.data.code,'PROVIDER_UNCONFIGURED');assert.equal((await call('/api/assessments')).data.assessments.length,0)});
@@ -19,3 +19,22 @@ test('idempotent research submission creates one run',async t=>{let calls=0;cons
 test('capacity is enforced for simultaneous distinct requests',async t=>{const runner=async({signal})=>new Promise((resolve,reject)=>signal.addEventListener('abort',()=>reject(signal.reason),{once:true}));const {call}=await setup(t,{configured:true,runner,maxRunning:1});const rs=await Promise.all([call('/api/assessments',{question:'First test question?'}),call('/api/assessments',{question:'Second test question?'})]);assert.deepEqual(rs.map(r=>r.status).sort(),[202,429])});
 test('cancel request persists cancellation rather than claiming completion',async t=>{const runner=async({signal})=>new Promise((resolve,reject)=>signal.addEventListener('abort',()=>reject(signal.reason),{once:true}));const {call}=await setup(t,{configured:true,runner});const a=(await call('/api/assessments',{question:'Can this job be cancelled?'})).data;assert.equal((await call(`/api/assessments/${a.id}/cancel`,{})).status,202);let final;for(let i=0;i<20;i++){final=(await call(`/api/assessments/${a.id}`)).data;if(final.status==='cancelled')break;await new Promise(r=>setTimeout(r,10))}assert.equal(final.status,'cancelled');assert.equal(final.analysis,undefined)});
 test('invalid public origin is rejected before a store is opened',async()=>{await assert.rejects(()=>createApplication({publicOrigin:'https://example.org/path',accessToken:'a'.repeat(32)}),e=>e.code==='INSECURE_CONFIG')});
+
+test('named harness agents can be selected per research run and are persisted',async t=>{
+  const registry=new AgentRegistry({config:{roles:{orchestrator:'strong',worker:'grunt'},agents:{
+    strong:{driver:'command',command:[process.execPath,'unused-strong.mjs'],model:'strong-model',capabilities:{search:false}},
+    grunt:{driver:'command',command:[process.execPath,'unused-grunt.mjs'],model:'grunt-model',capabilities:{search:true}}
+  }}});
+  let received;
+  const runner=async args=>{received=args;await new Promise((resolve,reject)=>args.signal.addEventListener('abort',()=>reject(args.signal.reason),{once:true}));};
+  const {call}=await setup(t,{configured:undefined,agentRegistry:registry,runner});
+  const cfg=(await call('/api/config')).data;
+  assert.deepEqual(cfg.agents.defaults,{orchestrator:'strong',worker:'grunt'});
+  assert.equal(JSON.stringify(cfg).includes('unused-strong.mjs'),false);
+  const created=(await call('/api/assessments',{question:'Does this harness-selected investigation preserve its agent roles?',orchestratorAgent:'strong',workerAgent:'grunt'})).data;
+  for(let i=0;i<20&&!received;i++)await new Promise(r=>setTimeout(r,5));
+  assert.equal(received.orchestratorAgent,'strong');assert.equal(received.workerAgent,'grunt');
+  const saved=(await call('/api/assessments/'+created.id)).data;
+  assert.deepEqual(saved.agents,{orchestrator:'strong',worker:'grunt'});
+  await call('/api/assessments/'+created.id+'/cancel',{});
+});

@@ -75,3 +75,22 @@ test('JSONL task line limits also apply to a whole line inside a single read chu
   await writeFile(file,'{"contract":{},"packets":[]}\n'+JSON.stringify({x:'a'.repeat(25000)})+'\n');
   assert.throws(()=>[...readJSONL(file)],/line too large/);
 });
+
+test('Probability Lab preparation forwards user-selected orchestrator and grunt agents and persists them',async t=>{
+  const selections=[];
+  const providerFactory=selection=>{
+    selections.push(selection||{});
+    const p=models();
+    return {...p,orchestratorName:selection?.orchestratorAgent||'default-strong',workerName:selection?.workerAgent||'default-grunt'};
+  };
+  const a=await app(t,{scaleOptions:{providers:providerFactory,clientFactory:()=>new SyntheticClient()}});
+  const saved=await a.store.create(parent());
+  const start=await a.request('/api/scale/prepare',{assessmentId:saved.id,expectedRevision:saved.revision,maxQuestions:10,orchestratorAgent:'codex-high',workerAgent:'gemini-worker'},{'Idempotency-Key':'selected-agent-plan'});
+  assert.equal(start.status,202);
+  const prep=await until(async()=>{const x=await a.store.get(start.data.preparationId);return x.status!=='running'?x:null;});
+  assert.equal(prep.status,'scale-planned');
+  const campaign=a.scale.store.get(prep.campaignId);
+  assert.equal(campaign.plan.agents.orchestrator,'codex-high');
+  assert.equal(campaign.plan.agents.worker,'gemini-worker');
+  assert.ok(selections.some(x=>x.orchestratorAgent==='codex-high'&&x.workerAgent==='gemini-worker'));
+});
