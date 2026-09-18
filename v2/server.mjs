@@ -9,11 +9,12 @@ import {analyzeGraph} from './graph.mjs';
 import {createDemo} from './demo.mjs';
 import {digest, sourceURL, validateEvidence} from './evidence.mjs';
 import {runAudit} from './pipeline.mjs';
+import {ScaleService} from './scale/service.mjs';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const terminal = new Set(['ready', 'partial', 'demo', 'scenario', 'descriptive', 'needs_clarification', 'interrupted', 'failed', 'cancelled']);
 const sameSecret = (a, b) => { if (typeof a !== 'string' || typeof b !== 'string') return false; const x = Buffer.from(a), y = Buffer.from(b); return x.length === y.length && timingSafeEqual(x, y); };
 const snapshot = (model, analysis, reason) => ({at: new Date().toISOString(), modelHash: auditHash(model), engineVersion: analysis.engineVersion, range: analysis.root.range, reason, model: structuredClone(model)});
-export async function createApplication({directory = process.env.VERACITY_DATA_DIR || join(HERE, '.data'), host = process.env.HOST || '127.0.0.1', port = Number(process.env.PORT || 8787), accessToken = process.env.VERACITY_ACCESS_TOKEN || '', publicOrigin = process.env.PUBLIC_ORIGIN || '', configured = Boolean(process.env.OPENAI_API_KEY && process.env.OPENAI_MODEL), runner = runAudit, maxRunning = 2, maxAssessments = 200} = {}) {
+export async function createApplication({directory = process.env.VERACITY_DATA_DIR || join(HERE, '.data'), host = process.env.HOST || '127.0.0.1', port = Number(process.env.PORT || 8787), accessToken = process.env.VERACITY_ACCESS_TOKEN || '', publicOrigin = process.env.PUBLIC_ORIGIN || '', configured = Boolean(process.env.OPENAI_API_KEY && (process.env.OPENAI_ORCHESTRATOR_MODEL || process.env.OPENAI_MODEL)), runner = runAudit, maxRunning = 2, maxAssessments = 200, scaleOptions = {}} = {}) {
   const local = ['127.0.0.1', 'localhost', '::1'].includes(host);
   if (publicOrigin) {
     let origin; try { origin = new URL(publicOrigin); } catch { throw new AuditError('Invalid PUBLIC_ORIGIN', 'INSECURE_CONFIG', 500); }
@@ -23,6 +24,8 @@ export async function createApplication({directory = process.env.VERACITY_DATA_D
   requireThat(!accessToken || accessToken.length >= 24, 'Access token must have at least 24 characters');
   requireThat(Number.isInteger(port) && port >= 0 && port <= 65535, 'Invalid port');
   const store = await new AuditStore(directory).init(), running = new Map(), idem = new Map(), rate = new Map();
+  let scale;
+  try { scale = await new ScaleService({directory, audits: store, ...scaleOptions}).init(); } catch (e) { await store.close(); throw e; }
   const sessions = new Map(); let closing = false, pendingCreates = 0;
   function limited(key, max) {
     const now = Date.now();
@@ -90,7 +93,7 @@ export async function createApplication({directory = process.env.VERACITY_DATA_D
     if (key) { idem.set(key, {fingerprint, promise}); promise.catch(() => idem.delete(key)); if (idem.size > 300) idem.delete(idem.keys().next().value); }
     return promise;
   }
-  const assets = {'/': ['index.html', 'text/html'], '/app.mjs': ['app.mjs', 'text/javascript'], '/styles.css': ['styles.css', 'text/css']};
+  const assets = {'/scale': ['scale.html', 'text/html'], '/scale.mjs': ['scale.mjs', 'text/javascript'], '/scale.css': ['scale.css', 'text/css'], '/': ['index.html', 'text/html'], '/app.mjs': ['app.mjs', 'text/javascript'], '/styles.css': ['styles.css', 'text/css']};
   const server = http.createServer(async (req, res) => {
     const requestId = randomUUID();
     res.setHeader('X-Request-ID', requestId); res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('Referrer-Policy', 'no-referrer');
@@ -126,6 +129,7 @@ export async function createApplication({directory = process.env.VERACITY_DATA_D
         return json(res, 200, {ok: true});
       }
       requireThat(authorized, 'Enter the server access token', 'UNAUTHORIZED', 401);
+      if (await scale.handle(req, res, url, {body, json})) return;
       if (path === '/api/config' && req.method === 'GET') return json(res, 200, {version: '2.0.0-beta.1', researchConfigured: configured, jevConfigured: Boolean(process.env.TYPESAFE_API_KEY), activeRuns: running.size, localOnly: local, calibration: 'not-evaluated'});
       if (path === '/api/assessments' && req.method === 'GET') return json(res, 200, {assessments: (await store.list()).map(a => ({id: a.id, question: a.question, status: a.status, kind: a.kind, updatedAt: a.updatedAt, parentId: a.parentId || null, range: a.analysis?.root.range || null}))});
       if (path === '/api/assessments' && req.method === 'POST') return json(res, 202, await newResearch(await body(req), req.headers['idempotency-key']));
@@ -184,7 +188,7 @@ export async function createApplication({directory = process.env.VERACITY_DATA_D
     }
   });
   server.requestTimeout = 30000; server.headersTimeout = 10000;
-  return {server, store, running, host, port, async listen() { await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, host, resolve); }); return server.address(); }, async close() { closing = true; for (const job of running.values()) job.controller.abort(new AuditError('Server shutting down', 'CANCELLED')); await Promise.allSettled([...running.values()].map(j => j.promise)); await new Promise(resolve => server.close(resolve)); await store.close(); }};
+  return {server, store, scale, running, host, port, async listen() { await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, host, resolve); }); return server.address(); }, async close() { closing = true; await scale.close(); for (const job of running.values()) job.controller.abort(new AuditError('Server shutting down', 'CANCELLED')); await Promise.allSettled([...running.values()].map(j => j.promise)); await new Promise(resolve => server.close(resolve)); await store.close(); }};
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const app = await createApplication(); const address = await app.listen();

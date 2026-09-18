@@ -15,6 +15,8 @@ async function check(directory) {
   }
 }
 await check(resolve(root));
-const html = await readFile(join(root, 'public/index.html'), 'utf8');
-if (/https?:\/\//.test(html.replace(/placeholder="https:\/\/…"/, ''))) throw new Error('Unexpected external dependency in entrypoint');
+for (const name of ['index.html', 'scale.html']) {
+  const html = await readFile(join(root, 'public', name), 'utf8');
+  if (/https?:\/\//.test(html.replace(/placeholder="https:\/\/…"/, ''))) throw new Error(`Unexpected external dependency in ${name}`);
+}
 console.log('All JavaScript modules parse; browser entrypoint has no CDN dependencies.');

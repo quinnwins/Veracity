@@ -1,5 +1,6 @@
 import {AuditError, requireThat, probability} from './engine.mjs';
 import {makeJudgmentEnvelope} from './evidence.mjs';
+import {SCALE_SCHEMAS} from './scale/schemas.mjs';
 const object = properties => ({type: 'object', properties, required: Object.keys(properties), additionalProperties: false});
 const str = {type: 'string'}, bool = {type: 'boolean'}, strings = {type: 'array', items: str};
 const array = items => ({type: 'array', items});
@@ -8,6 +9,7 @@ const range = {type: 'array', items: {type: 'number'}, minItems: 2, maxItems: 2}
 const relation = object({kind: {type: 'string', enum: ['and', 'or', 'informational', 'evidence']}, children: strings, dependence: str, exclusivity: str, equivalent: bool, rationale: str, independenceRationale: str});
 const node = object({id: str, text: str, type: {type: 'string', enum: ['claim', 'subclaim', 'premise', 'atomic', 'hypothesis', 'definition', 'value']}, falsifier: str, relation: nullable(relation), nextInvestigation: str});
 export const SCHEMAS = {
+  ...SCALE_SCHEMAS,
   decomposition: object({contract: object({wording: str, reading: str, falsifier: str, scope: str, alternatives: strings, needsClarification: bool, mode: {type: 'string', enum: ['empirical', 'descriptive']}}), rootId: str, rivalRootIds: strings, nodes: array(node)}),
   atomicity: object({reviews: array(object({nodeId: str, atomic: bool, reason: str, observation: str, children: array(object({text: str, falsifier: str})), relation: nullable(relation)}))}),
   elicitation: object({abstain: bool, reason: str, prior: nullable(range), referenceClass: str, priorRationale: str, excludesEvidenceIds: strings, jointLR: nullable(range), jointRationale: str, references: array(object({sourceId: str, quote: str})), observation: str, nextInvestigation: str}),

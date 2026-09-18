@@ -7,13 +7,15 @@ export const PIPELINE_VERSION = '2.0.0-beta.1';
 const nonnumeric = n => ['definition', 'value'].includes(n.type);
 const eligible = n => !nonnumeric(n) && !['and', 'or'].includes(n.relation?.kind) && n.atomicity?.status !== 'unresolved';
 const now = () => new Date().toISOString();
-export async function runAudit({question, previousModel, targetNodeId, signal, onProgress = async () => {}, provider, judge, fetcher = fetchSource, limits = {}}) {
+export async function runAudit({question, previousModel, targetNodeId, signal, onProgress = async () => {}, provider, worker, judge, fetcher = fetchSource, limits = {}}) {
   const budget = provider?.budget || new RunBudget(limits);
-  provider ||= new OpenAIProvider({budget}); judge ||= new JevProvider({budget});
+  provider ||= new OpenAIProvider({budget, model: process.env.OPENAI_ORCHESTRATOR_MODEL || process.env.OPENAI_MODEL});
+  worker ||= process.env.OPENAI_WORKER_MODEL ? new OpenAIProvider({budget, model: process.env.OPENAI_WORKER_MODEL}) : provider;
+  judge ||= new JevProvider({budget});
   requireThat(provider.configured, 'Live research needs server-side OPENAI_API_KEY and OPENAI_MODEL', 'PROVIDER_UNCONFIGURED', 503);
   const maxNodes = limits.maxNodes || 40, maxRounds = limits.maxRounds || 2, maxTargets = limits.maxTargets || 6;
   const combinedSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(600000)]) : AbortSignal.timeout(600000);
-  const warnings = [], retrieval = [], modelVersions = {requested: provider.model, pipeline: PIPELINE_VERSION};
+  const warnings = [], retrieval = [], modelVersions = {requested: provider.model, workerRequested: worker.model, pipeline: PIPELINE_VERSION};
   let model, reviewComplete = false;
   const emit = async stage => { combinedSignal.throwIfAborted(); await onProgress({stage, model: model ? structuredClone(model) : null, usage: budget.snapshot()}); };
   if (previousModel) {
@@ -66,7 +68,7 @@ export async function runAudit({question, previousModel, targetNodeId, signal, o
   for (const [id, n] of targets.slice(0, maxTargets)) {
     await emit(`Finding supporting and contrary evidence · ${id}`);
     try {
-      const search = await provider.search(n, model.contract, combinedSignal), packets = [];
+      const search = await worker.search(n, model.contract, combinedSignal), packets = [];
       retrieval.push({nodeId: id, at: now(), ...search});
       for (const s of search.sources.slice(0, 3)) {
         try {
