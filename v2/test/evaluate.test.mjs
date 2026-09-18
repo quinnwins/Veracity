@@ -1,0 +1,11 @@
+import test from 'node:test'; import assert from 'node:assert/strict'; import {evaluatePredictions} from '../evaluate.mjs';
+const row=(id,p,outcome)=>({id,task:'test-only',model:'test-v1',probability:p,outcome,predictedAt:'2025-01-01',resolvedAt:'2025-02-01'});
+test('Brier and log loss follow resolved outcomes',()=>{const r=evaluatePredictions([row('1',.8,1),row('2',.2,0)]);assert.ok(Math.abs(r.brier-.04)<1e-12);assert.ok(Math.abs(r.logLoss + Math.log(.8))<1e-12);assert.equal(r.count,2)});
+test('certainty on the wrong outcome has infinite log loss, not hidden clipping',()=>assert.equal(evaluatePredictions([row('1',1,0)]).logLoss,'infinite'));
+test('probability one is included in final reliability bucket',()=>assert.equal(evaluatePredictions([row('1',1,1)]).reliability.at(-1).count,1));
+test('duplicate benchmark examples rejected',()=>assert.throws(()=>evaluatePredictions([row('a',.5,1),row('a',.5,0)]),/unique/));
+test('post-resolution predictions rejected',()=>assert.throws(()=>evaluatePredictions([{...row('a',.5,1),predictedAt:'2025-03-01'}]),/precede/));
+test('post-prediction evidence cutoff rejected',()=>assert.throws(()=>evaluatePredictions([{...row('a',.5,1),evidenceCutoff:'2025-01-02'}]),/cutoff/));
+test('incompatible calibration populations not pooled',()=>assert.throws(()=>evaluatePredictions([row('a',.5,1),{...row('b',.5,0),task:'other'}]),/population/));
+test('fractional model-agreement labels rejected',()=>assert.throws(()=>evaluatePredictions([row('a',.5,.7)]),/binary/));
+test('empty benchmark does not produce a calibration certificate',()=>assert.throws(()=>evaluatePredictions([]),/resolved/));

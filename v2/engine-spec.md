@@ -1,76 +1,29 @@
-# V2 inference engine
+# Executable inference rules
 
-Language models propose structure and make local semantic judgments. Deterministic code enforces probability relationships.
+`engine.mjs` owns arithmetic; `graph.mjs` owns traversal, gating, and diagnostics. Inputs are strict finite ordered intervals, not silently clamped/reordered values. UI state is not an input.
 
-## Evidence update
+## Binary evidence
 
-For binary H:
+For each declared conditionally independent evidence cluster, update log odds by log LR. LR means P(E|H)/P(E|not H). Exact prior endpoints 0 and 1 are preserved under finite positive likelihoods. Intermediate updates use stable log-space arithmetic.
 
-```
-logit(P(H|E)) = logit(P(H)) + sum(log(LR_cluster))
-```
+`validateEvidence` checks source text, quotes, digests, provenance, and optional historical cutoffs. `collapseEvidence` collapses an exact repeated observation in a cluster and rejects conflicting updates. Automated research supplies a single joint LR for each target's entire source packet; it does not assume articles are independent.
 
-Evidence is grouped by independence cluster before updating. A cluster contributes one effective update.
+## Composition
 
-## AND relationships
+AND/OR composition additionally requires `equivalent: true` and a rationale establishing that the parent event is logically equivalent to that composition. Merely necessary conditions, mechanisms, or supporting premises cannot substitute for this. Informational/causal maps do not generate root probabilities by multiplying their leaves.
 
-Never blindly multiply.
+Independent AND: multiply probabilities. Unknown-dependence AND: lower bound max(0, sum lower endpoints − (n−1)); upper bound min upper endpoints. Independent OR uses complements. Exclusive OR sums, rejecting infeasible lower sums. Unknown-overlap OR uses max lower endpoint and min(1, sum upper endpoints).
 
-Independent children:
-`P(A and B) = P(A)P(B)`
+Independence needs an explicit rationale. Reused primitive inputs, source IDs, or observation clusters across branches force dependence bounds. These are deterministic ID checks, not proof that all hidden real-world dependence has been discovered.
 
-Unknown dependence uses Frechet bounds:
-`max(0, P(A)+P(B)-1) <= P(A and B) <= min(P(A),P(B))`
+Normalized multi-hypothesis updates require explicit exclusive/exhaustive flags, disclosed priors summing to one, and likelihoods relative to a common reference. Arbitrary H-versus-rest odds for different hypotheses cannot be normalized as a coherent likelihood vector. This function is tested; the default research interface leaves potentially overlapping rivals unnormalized.
 
-For N events:
-`max(0, sum(P(Ai))-(N-1)) <= P(all) <= min(P(Ai))`
+## Abstention and mandatory review
 
-If dependence is modeled, use the declared model.
+Unresolved atomicity, missing priors/reference classes, missing required children, unsupported semantics, invalid citations, and unfinished mandatory adversarial review withhold numerical results. An incomplete review is stored on the model, so a later scenario or recomputation cannot bypass it.
 
-## OR relationships
+## Diagnostics
 
-Exclusive: `P(A or B)=P(A)+P(B)`
+Credence is an envelope under declared assumptions, not a calibrated confidence interval. Grounding is the transparent count of root-relevant probability inputs with inspectable source passages. Stability reports implemented one-at-a-time prior/LR endpoint movement, not a separate probability or comprehensive structural robustness.
 
-Independent: `P(A or B)=1-(1-P(A))(1-P(B))`
-
-Unknown overlap returns bounds or abstains.
-
-## Alternative sets
-
-Normalized Bayesian hypothesis updating is allowed only when the set is explicitly exclusive and exhaustive. Otherwise each hypothesis keeps an independent credence.
-
-## UI isolation
-
-Inference cannot receive expanded nodes, selected tabs, hidden-depth state, scroll state, or visual mode. A regression test must prove presentation toggles cannot alter the posterior.
-
-## Provenance
-
-Every non-derived probability requires provenance. Every derived probability stores the rule, input IDs, and engine version.
-
-## Grounding
-
-Initial metric: sensitivity-weighted fraction of posterior-sensitive nodes backed by inspectable evidence. An unsupported decorative leaf barely matters; an unsupported crux sharply lowers grounding.
-
-## Stability
-
-Perturb plausible prior ranges, LR ranges, ambiguous readings, and dependence assumptions. Stability summarizes expected posterior displacement. It is not itself a probability.
-
-## Crux ranking
-
-For each tunable node: hold other inputs constant, sweep the node across its plausible range, recompute root, and rank by root posterior displacement.
-
-## Value of information
-
-For candidate observation outcomes O:
-
-```
-EIG = H(current posterior) - sum_o P(o) H(posterior | o)
-```
-
-If outcome probabilities are unavailable, show **potential posterior swing** instead of fabricating EIG. A product priority can divide information value by estimated cost, but the components remain visible.
-
-## Abstain
-
-Return `abstain` when a load-bearing claim is underspecified, relation semantics are missing, duplicate/correlation structure is unresolved, a required LR has no defensible elicitation, or a requested normalized hypothesis set is not exclusive/exhaustive.
-
-The abstention output must identify the missing information needed to continue.
+EIG is computed only for point posteriors and a predictive outcome distribution satisfying both normalization and the law of total probability. Interval midpoints do not invent a predictive distribution. The interface otherwise reports potential movement.

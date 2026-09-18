@@ -1,0 +1,14 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {EventEmitter} from 'node:events';import {PassThrough} from 'node:stream';import {fetchSource,digest} from '../evidence.mjs';
+const text='This is a synthetic network fixture containing enough readable source text to verify the fetcher, its digest, and pinned DNS connection. No real internet source is used.';
+const publicDNS=async()=>[{address:'8.8.8.8',family:4}];
+function transport({status=200,type='text/plain',body=text,location,inspect=()=>{}}={}) {
+ return (url,opts,callback)=>{const req=new EventEmitter();req.destroy=e=>{queueMicrotask(()=>req.emit('error',e));return req};inspect(url,opts);
+ queueMicrotask(()=>{const res=new PassThrough();res.statusCode=status;res.headers={'content-type':type,...(location?{location}:{})};callback(res);res.end(Buffer.from(body));});return req;};
+}
+test('source fetch pins the validated DNS address into the TLS request',async()=>{let pinned;const s=await fetchSource('https://example.org/x',{lookup:publicDNS,request:transport({inspect:(_u,o)=>{o.lookup('example.org',{all:true},(_e,addresses)=>{pinned=addresses});assert.equal(o.agent,false);assert.equal(o.headers['Accept-Encoding'],'identity')}})});assert.equal(pinned[0].address,'8.8.8.8');assert.equal(s.sha256,digest(s.text));assert.equal(s.publishedAt,null);assert.equal(s.verification,'exact-text-only')});
+test('mixed public/private DNS fails before a connection',async()=>{let connected=false;await assert.rejects(()=>fetchSource('https://example.org',{lookup:async()=>[{address:'8.8.8.8'},{address:'10.0.0.1'}],request:()=>{connected=true}}),/private/);assert.equal(connected,false)});
+test('redirect to private address is rejected',async()=>{await assert.rejects(()=>fetchSource('https://example.org',{lookup:publicDNS,request:transport({status:302,location:'https://169.254.169.254/latest'})}),/Private/)});
+test('redirect limit is enforced',async()=>{await assert.rejects(()=>fetchSource('https://example.org',{lookup:publicDNS,request:transport({status:302,location:'https://example.org/again'}),redirects:0}),/redirect limit/)});
+test('PDF retrieval is explicitly unsupported, not fake-extracted',async()=>{await assert.rejects(()=>fetchSource('https://example.org/study.pdf',{lookup:publicDNS,request:transport({type:'application/pdf'})}),/PDF extraction is not implemented/)});
+test('source byte budget aborts oversized body',async()=>{await assert.rejects(()=>fetchSource('https://example.org',{lookup:publicDNS,request:transport(),maxBytes:20}),/size limit/)});
+test('cancellation interrupts unresolved DNS',async()=>{const controller=new AbortController();const promise=fetchSource('https://example.org',{lookup:()=>new Promise(()=>{}),signal:controller.signal});controller.abort(new Error('Stop during DNS'));await assert.rejects(()=>promise,/Stop during DNS/)});

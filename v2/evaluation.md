@@ -1,36 +1,17 @@
-# V2 evaluation
+# Evaluation: implemented harness and outstanding benchmark
 
-The benchmark separates **document interpretation** from **world prediction**.
+`evaluate.mjs` computes Brier score, log loss, reliability bins, and empirical calibration error from supplied resolved binary predictions. It rejects duplicate IDs, invalid probabilities, predictions dated after resolution, evidence cutoffs after prediction, and mixed task/model populations. Certain wrong predictions retain infinite log loss rather than being silently clipped.
 
-## Evidence-judgment benchmark
+```sh
+node evaluate.mjs reviewed-predictions.jsonl
+```
 
-Build 500–1,000 reviewed examples for passage↔claim relevance, support/contradict/mixed/unresolved, measurement fit, and duplicate/shared-root detection.
+Each row: id, task, model, probability, outcome (0 or 1), predictedAt, resolvedAt, and optionally evidenceCutoff. Run one task/model population at a time. Labels must come from reviewed annotations or independently resolved events, not agreement with another language model. Timestamp checks cannot establish that a model's training data did not leak a result.
 
-Measure accuracy/F1 where appropriate, Brier score, log loss, calibration, selective accuracy at abstention thresholds, latency, and cost.
+## Still required
 
-Compare pinned Jev, a capable reasoning model, and a simple baseline where meaningful.
+Construct a reviewed corpus for atomic decomposition quality, passage relevance, support/contradiction, outcome measurement fit, source-root duplication, and graph semantics. Reserve a genuinely held-out set. Separately evaluate world predictions under historical evidence cutoffs or prospective outcomes. Document label provenance and uncertainty.
 
-## End-to-end historical benchmark
+Compare the complete workflow against simple baselines and direct larger-model assessment. Measure accuracy, calibration, selective accuracy/abstention, latency, retrieval coverage, and actual provider cost. Do not optimize for agreement with a larger model as if it were ground truth.
 
-Use questions whose outcomes were unknown at a historical cutoff but are known now. Freeze evidence to the cutoff date. Measure Brier/log score, calibration, sharpness, abstention quality, update direction after new evidence, and duplicate-evidence robustness. Never leak post-cutoff evidence.
-
-## Invariant tests
-
-1. Duplicate the same source ten times → posterior unchanged.
-2. Quote one primary through five articles → one independence cluster.
-3. Hide/open every UI node → posterior unchanged.
-4. P(not H) displayed as exact code-derived complement of P(H).
-5. AND relation changed from independent to bounded → output widens.
-6. Overlapping hypotheses → no forced normalization.
-7. Remove provenance from a crux → grounding drops.
-8. Widen a load-bearing prior → stability drops or posterior widens.
-9. Contradictory evidence remains visible.
-10. Missing relation semantics → abstain.
-
-## Jev success gate
-
-Jev becomes default for a local judgment only if it clears a predefined held-out quality floor and materially improves latency/cost. Optimize against reviewed labels or resolved outcomes, not agreement with the larger model.
-
-## Calibration
-
-A 0.8 prediction should be correct roughly 80% of the time on the appropriate evaluation population. If not, fit a held-out calibrator and version it. Calibration is task/domain-specific.
+No such corpus, measured real-model accuracy, trained calibration mapping, or world-class ranking is included in this revision. Synthetic engine tests establish arithmetic/software properties only. Refer to `QA_REPORT.md` for what ran.

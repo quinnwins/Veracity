@@ -1,94 +1,91 @@
-# Veracity V2 — Belief Engine
+# Veracity V2 — an inspectable research workspace
 
-V2 keeps the strongest parts of V1 — exact claim parsing, decomposition, rival explanations, uncertainty, provenance, Bayesian updates, sensitivity checks, and plain-English presentation — but changes the core product from a verdict page into a **living belief graph**.
+**Working, tested private beta. Not a certified production release or a claim of calibrated accuracy.** V1 at the repository root is unchanged. V2 is an independent Node application, not the earlier static mockup.
 
-## Product thesis
+## Run it
 
-Most fact-checking products answer "What do we think?" V2 answers:
+Node.js 22 or later. No runtime packages, API keys, or CDN dependencies are needed for the worked example.
 
-1. What exactly are we claiming?
-2. What must be true for it to hold?
-3. What evidence actually changes the odds?
-4. Where does the uncertainty come from?
-5. **What should we investigate next?**
+```sh
+cd v2
+npm test
+npm run check
+npm start
+```
 
-That fifth question is the differentiator. V2 is an uncertainty-reduction engine.
+Open `http://127.0.0.1:8787`. Select **Explore a worked example**. Its logs and numerical inputs are clearly labeled fictional. The displayed probability is actually computed. Click an assumption, save a separate what-if scenario, add a quoted observation, inspect version history, and export the complete record.
 
-## The V2 loop
+For live research:
 
-claim → claim contract → belief graph → evidence ledger → posterior → crux ranking → value-of-information ranking → best next investigation → new evidence → update
+```sh
+cp .env.example .env
+# Edit .env with OPENAI_API_KEY and OPENAI_MODEL.
+# TYPESAFE_API_KEY is optional.
+npm start
+```
 
-## Keep from V1
+Choose an OpenAI model available to your account that supports the Responses API, strict structured outputs, and web search. Prefer a pinned version. There is deliberately no assumed default model or bundled credential. Keys remain server-side. A missing provider returns a clear error; arbitrary questions never receive the demo's static numbers.
 
-- Loaded-term parsing and multiple readings.
-- Claim → subclaim → premise → atomic decomposition.
-- Credence ranges rather than fake precision.
-- Rival hypotheses and symmetric effort.
-- Source provenance and independence clusters.
-- Likelihood-ratio evidence updates.
-- Prior disclosure and sensitivity sweeps.
-- "What would change this?" and truthful revision.
-- Plain English first; math underneath.
+## What works
 
-## Replace from V1
+**Ask → research → assessment.** A server-side job preserves the exact question, constructs a claim contract, decomposes the graph, checks leaves for hidden assumptions, searches for supporting and contrary evidence, fetches readable source text, validates exact quotations, elicits a disclosed evidence model, challenges it, and runs deterministic inference. Stage events, failures, usage, requested/returned provider versions, sources, and results are saved.
 
-- **Authored headline probability:** displayed claim probability is computed from one declared graph path. Authored/model estimates are inputs with provenance.
-- **UI-dependent inference:** opening/hiding a node can never alter inference.
-- **min/product ambiguity:** relations explicitly declare AND, OR, evidence, alternative-set, or informational semantics.
-- **Overlapping alternatives:** normalized hypothesis distributions are only legal for exclusive + exhaustive sets.
-- **One overloaded confidence number:** V2 separately shows credence, grounding, and stability.
+**An operational stopping rule.** A leaf stops at a specified measurement or definition boundary. Unresolved leaves remain unresolved when depth, node, time, or call budgets are reached. The system does not claim philosophical irreducibility.
 
-## Jev's role
+**One coherent computation.** AND/OR composition requires an explicitly justified logical equivalence, not merely necessary conditions or plausible causes. An explanation map is not multiplied into a truth probability. Unknown dependence uses bounds. Shared input/source/cluster IDs prevent an independent-product shortcut. Invalid numerical inputs are rejected rather than repaired silently.
 
-Jev is an **evidence judge**, not the Bayesian engine.
+**Evidence you can inspect.** Exact quotations are checked against stored text and SHA-256 digests. Repeated observations in the same cluster cannot compound the update. Conflicting cluster estimates require a joint likelihood. Automated research elicits one joint likelihood for its whole packet rather than pretending that several articles are independent experiments. Model priors and likelihoods remain explicitly uncalibrated judgments.
 
-Good tasks: passage relevance to an atomic claim; support/contradict/mixed/unresolved classification; whether two sources share the same underlying observation; whether a measured outcome matches the claim; structured classification over shared evidence.
+**Useful next work.** One-at-a-time prior and likelihood endpoint sweeps identify assumptions capable of moving the root. Focused follow-up research creates a linked assessment, retains its original pre-evidence prior, and replaces its joint evidence update rather than updating on its own previous posterior.
 
-Every Jev judgment stores provider, pinned model version, exact question, probability distribution, source span, and timestamp.
+**Stateful exploration.** What-if scenarios leave the original untouched. Evidence changes create version snapshots, with optimistic concurrency checks and JSON export. Failed, cancelled, and interrupted jobs retain the evidence already saved. The browser shows no finished answer for an unfinished run.
 
-A Jev probability is not automatically P(the world claim), a likelihood ratio, independent evidence, or calibrated for the target domain. Deterministic code owns arithmetic and probability identities.
+**Private service controls.** Same-origin write checks, Host validation, server-side credentials, HttpOnly sessions, request limits, bounded concurrency, idempotency, response-size caps, abort signals, strict source URL checks, DNS address pinning, and redirect revalidation are implemented. This is a single-user, single-process workspace, not a multi-tenant SaaS platform.
 
-## Core product surfaces
+## How to interpret the display
 
-### Ask
-One field: "What are you trying to figure out?" Before scoring, create a claim contract: exact wording, scope/population, horizon, outcome, loaded terms, alternative readings, and falsifier.
+- **Conditional credence** is an envelope under disclosed prior, likelihood, and dependence assumptions. It is not a measured confidence interval or universal truth score.
+- **Evidence coverage** counts numerical inputs with inspectable passages. It is not source quality, correctness, or a percentage chance of truth.
+- **Assumption sensitivity** measures endpoint movement in the implemented sweeps. It does not measure all structural uncertainties.
+- **Expected information gain** is available as a tested arithmetic function only when a coherent predictive distribution is supplied. The UI otherwise says potential movement; it never fabricates EIG from arbitrary interval midpoints.
 
-### Current view
-Show current credence range, grounding, stability, 2–4 live cruxes, one-sentence reason, and **best next investigation**. No giant methodology dashboard.
+Jev's implemented role is a pinned-version **passage relevance diagnostic**. It is stored separately from the likelihood model. Relevance probability is never treated as a likelihood ratio or world-claim probability. Direction, measurement-fit, and semantic duplicate classifiers are future benchmark-gated extensions, not shipped capabilities.
 
-### Belief graph
-Click a node to inspect evidence, provenance, dependencies, and sensitivity. Changing an assumption creates a scenario rather than silently mutating the canonical assessment.
+Definitions and value choices are separated from empirical claims. Political/electoral requests are directed to descriptive evidence maps, without political rankings, endorsements, or election-outcome probabilities.
 
-### Evidence ledger
-Each observation records exact source/span, date, primary basis, independence cluster, target node, likelihood model/elicitation, evaluator/version, and observed/disputed/ungrounded status. Correlated evidence is collapsed before updating.
+## Evaluation and verification
 
-### Crux + next experiment
-Rank assumptions by posterior swing. For each, show current uncertainty, possible observation, potential information gain, cost/latency, and recommended next investigation.
+```sh
+npm test                  # 147 automated tests at this revision
+npm run check             # Parse every JS module; check no CDN entrypoint dependency
+node evaluate.mjs reviewed-predictions.jsonl
+```
 
-### History
-Every material update creates a snapshot such as: "62–74% → 41–55% because source X weakened premise P3." The system becomes useful over time instead of producing disposable reports.
+The evaluator accepts one task/model population per run. Each JSONL row needs `id`, `task`, `model`, `probability`, binary `outcome`, `predictedAt`, and later `resolvedAt`; an optional `evidenceCutoff` cannot be after prediction. It reports Brier score, log loss, reliability bins, and calibration error. **No real held-out benchmark or fitted calibrator is included.** Synthetic test fixtures verify the implementation, not model accuracy.
 
-## Probability concepts
+See `QA_REPORT.md` for exact checks and limitations. HTTP integration tests use a real local server and temporary storage. Provider tests use injected responses following documented contracts. Offline Chromium checks use server-generated records and a browser transport test double. Live browser navigation was blocked by the execution environment; the full browser/server script is supplied for a normal development machine.
 
-**Credence:** how likely is the claim under the declared model?
+## Deployment boundary
 
-**Grounding:** how much of the load-bearing graph is tied to inspectable evidence?
+The default binds only to `127.0.0.1`. For access through a reverse proxy, set a random `VERACITY_ACCESS_TOKEN` of at least 24 characters and a bare HTTPS `PUBLIC_ORIGIN`, and restrict direct access to the backend port. Terminate TLS at the proxy. Never expose the local unauthenticated mode to a network. Sessions expire after eight hours; keys are not returned by `/api/config`.
 
-**Stability:** how much do reasonable changes in priors, likelihoods, readings, and dependence assumptions move the answer?
+Storage defaults to `.data`, with private directory/file modes, a single-writer lock, atomic replacement, integrity hashes, and persisted revisions. Use a persistent disk with backups and a quota. Hashes detect accidental corruption; they are not signatures proving truth or resisting an administrator rewriting the store. This storage design targets POSIX systems and is not a horizontally scalable database.
 
-Model agreement may be diagnostic telemetry, but is not a synonym for truth.
+After a hard crash, inspect `.data/.writer.lock` and verify its recorded process has stopped before removing the stale lock. Do not run two writers against one directory. Interrupted runs are marked on restart. There is no automatic resumption of paid provider work.
 
-## Non-negotiable invariants
+Default limits: 24 provider requests (retries count), 24 source fetches, 180,000 reported model tokens, 40 graph nodes, two atomicity review rounds, six researched targets, ten-minute run deadline, two concurrent jobs, 200 assessments, and 30 evidence snapshots per assessment. A token limit is checked between calls and can be exceeded by the final response; it is not a guaranteed billing cap. No 15-hour background scheduler is installed.
 
-1. Same graph + same inputs = same posterior regardless of UI state.
-2. No evidence is counted twice through citation chains or duplicated reports.
-3. Every probability has provenance: measured, model-estimated, elicited, or derived.
-4. No normalized multi-hypothesis posterior unless hypotheses are exclusive + exhaustive.
-5. Unsupported graph semantics produce "cannot compute", not an invented number.
-6. Models never perform arithmetic deterministic code can perform.
-7. A displayed claim probability is derived from one declared model path.
-8. Wide uncertainty and abstention are valid outputs.
-9. The system identifies the assumptions doing the work.
-10. The user can inspect why any update happened.
+Sources currently support public HTTPS IPv4 text/HTML/JSON. PDFs, login-protected pages, compressed content, and IPv6-only hosts fail explicitly. Publication dates are not guessed from retrieval time. Long sources have bounded model reading windows; truncation is recorded. These limitations can materially reduce research coverage.
 
-See `schema.md`, `engine-spec.md`, `jev-adapter.md`, and `evaluation.md`.
+See `PRODUCTION_READINESS.md` before deployment beyond a private evaluation workspace.
+
+## Main modules
+
+`engine.mjs` — probability rules and validation. `decomposition.mjs` — graph validation and stage prompts. `evidence.mjs` — provenance, deduplication, and safe retrieval. `graph.mjs` — inference, abstention, and sensitivity. `providers.mjs` — real provider adapters and budgets. `pipeline.mjs` — bounded research orchestration. `store.mjs` — durable audit records. `server.mjs` — HTTP service. `public/` — functional responsive interface. `evaluate.mjs` — outcome-based evaluation.
+
+Provider contracts checked against official documentation:
+
+- https://developers.openai.com/api/docs/guides/structured-outputs
+- https://developers.openai.com/api/docs/guides/tools-web-search
+- https://docs.typesafe.ai/api
+- https://docs.typesafe.ai/models
