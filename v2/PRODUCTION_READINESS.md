@@ -10,7 +10,7 @@
 
 ## Not demonstrated / must be completed before a production launch
 
-1. **Live provider integration:** real credentialed requests against the selected OpenAI model and pinned Jev version have not run in this environment. Current provider tests are contract tests with injected responses. Verify account/model compatibility, latency, usage accounting, cancellation, refusals, and error behavior.
+1. **Live provider integration:** real credentialed requests against every supported direct/harness agent path and the pinned Jev version have not run in this environment. Current provider tests are contract tests with injected responses. Verify account/model compatibility, latency, usage accounting, cancellation, refusals, and error behavior.
 2. **Accuracy and calibration:** no reviewed 500–1,000-item corpus, held-out historical benchmark, fitted calibrator, or externally evaluated performance exists in this patch. No claim of superior objectivity or accuracy is warranted from unit tests. The model eliciting priors, likelihoods, and its own audit can share biases; a second pass is not independent evidence.
 3. **Research completeness:** budgets can leave graph branches unresearched. One search request for both sides is not proof of balanced coverage. Source retrieval is limited to readable text, with bounded excerpt windows and no PDF extraction. Dates, citation-chain independence, external validity, and hidden shared datasets still need stronger verified representations.
 4. **Logical validity:** graph validators check structural rules, not semantic truth of a model's equivalence assertion, reference class, or likelihood rationale. These need benchmarked scrutiny and high-stakes review.

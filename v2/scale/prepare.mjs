@@ -1,17 +1,18 @@
 import {requireThat, AuditError} from '../engine.mjs';
 import {digest} from '../evidence.mjs';
 import {auditHash} from '../store.mjs';
-import {OpenAIProvider, RunBudget} from '../providers.mjs';
+import {RunBudget} from '../providers.mjs';
+import {createAgentRegistry} from '../agents.mjs';
 import {decompositionSystemPrompt} from '../decomposition.mjs';
 import {question, packet, validateContract} from './contracts.mjs';
 
-export function tierProviders() {
-  const key = process.env.OPENAI_API_KEY;
-  const orchestrator = new OpenAIProvider({key, model: process.env.OPENAI_ORCHESTRATOR_MODEL || process.env.OPENAI_MODEL,
-    budget: new RunBudget({maxCalls: 210, maxTokens: 1500000})});
-  const worker = new OpenAIProvider({key, model: process.env.OPENAI_WORKER_MODEL,
-    budget: new RunBudget({maxCalls: 64, maxTokens: 600000})});
-  return {orchestrator, worker};
+export function tierProviders({orchestratorAgent, workerAgent, registry = createAgentRegistry()} = {}) {
+  return registry.roles({
+    orchestrator: orchestratorAgent,
+    worker: workerAgent,
+    orchestratorBudget: new RunBudget({maxCalls: 210, maxTokens: 1500000}),
+    workerBudget: new RunBudget({maxCalls: 64, maxTokens: 600000})
+  });
 }
 export function sourceWindows(assessment, {maxWindows = 64} = {}) {
   const windows = [];
@@ -29,7 +30,7 @@ export function sourceWindows(assessment, {maxWindows = 64} = {}) {
   }
   return windows;
 }
-export async function prepareCampaign(assessment, {orchestrator, worker, maxQuestions = 500, signal, onProgress = async () => {}} = {}) {
+export async function prepareCampaign(assessment, {orchestrator, worker, orchestratorName, workerName, maxQuestions = 500, signal, onProgress = async () => {}} = {}) {
   requireThat(orchestrator?.configured && worker?.configured, 'Configure separate orchestrator and worker models before preparing a study', 'PROVIDER_UNCONFIGURED', 503);
   requireThat(Number.isSafeInteger(maxQuestions) && maxQuestions >= 1 && maxQuestions <= 100000, 'Invalid question limit');
   requireThat(assessment.model && !assessment.model.demo && assessment.model.contract.mode !== 'descriptive', 'Choose a saved empirical research assessment, not the fictional demo or a descriptive map', 'DESCRIPTIVE_ONLY', 422);
@@ -81,5 +82,6 @@ export async function prepareCampaign(assessment, {orchestrator, worker, maxQues
     plan: {workstreams: plan.workstreams, gaps, sourceWindows: used.map(p => p.window),
       requestedLimit: maxQuestions, actualCandidates: tasks.length, enumerationComplete: false,
       coverage: 'Bounded source-window exploration; not exhaustive decomposition or 100,000 independent facts',
+      agents: {orchestrator: orchestratorName || orchestrator.name || orchestrator.model, worker: workerName || worker.name || worker.model, orchestratorDriver: orchestrator.driver || 'openai', workerDriver: worker.driver || 'openai'},
       usage: {orchestrator: orchestrator.budget?.snapshot(), worker: worker.budget?.snapshot()}}};
 }

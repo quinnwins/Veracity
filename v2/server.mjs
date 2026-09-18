@@ -10,11 +10,12 @@ import {createDemo} from './demo.mjs';
 import {digest, sourceURL, validateEvidence} from './evidence.mjs';
 import {runAudit} from './pipeline.mjs';
 import {ScaleService} from './scale/service.mjs';
+import {createAgentRegistry} from './agents.mjs';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const terminal = new Set(['ready', 'partial', 'demo', 'scenario', 'descriptive', 'needs_clarification', 'interrupted', 'failed', 'cancelled']);
 const sameSecret = (a, b) => { if (typeof a !== 'string' || typeof b !== 'string') return false; const x = Buffer.from(a), y = Buffer.from(b); return x.length === y.length && timingSafeEqual(x, y); };
 const snapshot = (model, analysis, reason) => ({at: new Date().toISOString(), modelHash: auditHash(model), engineVersion: analysis.engineVersion, range: analysis.root.range, reason, model: structuredClone(model)});
-export async function createApplication({directory = process.env.VERACITY_DATA_DIR || join(HERE, '.data'), host = process.env.HOST || '127.0.0.1', port = Number(process.env.PORT || 8787), accessToken = process.env.VERACITY_ACCESS_TOKEN || '', publicOrigin = process.env.PUBLIC_ORIGIN || '', configured = Boolean(process.env.OPENAI_API_KEY && (process.env.OPENAI_ORCHESTRATOR_MODEL || process.env.OPENAI_MODEL)), runner = runAudit, maxRunning = 2, maxAssessments = 200, scaleOptions = {}} = {}) {
+export async function createApplication({directory = process.env.VERACITY_DATA_DIR || join(HERE, '.data'), host = process.env.HOST || '127.0.0.1', port = Number(process.env.PORT || 8787), accessToken = process.env.VERACITY_ACCESS_TOKEN || '', publicOrigin = process.env.PUBLIC_ORIGIN || '', configured, agentRegistry = createAgentRegistry(), runner = runAudit, maxRunning = 2, maxAssessments = 200, scaleOptions = {}} = {}) {
   const local = ['127.0.0.1', 'localhost', '::1'].includes(host);
   if (publicOrigin) {
     let origin; try { origin = new URL(publicOrigin); } catch { throw new AuditError('Invalid PUBLIC_ORIGIN', 'INSECURE_CONFIG', 500); }
@@ -25,8 +26,15 @@ export async function createApplication({directory = process.env.VERACITY_DATA_D
   requireThat(Number.isInteger(port) && port >= 0 && port <= 65535, 'Invalid port');
   const store = await new AuditStore(directory).init(), running = new Map(), idem = new Map(), rate = new Map();
   let scale;
-  try { scale = await new ScaleService({directory, audits: store, ...scaleOptions}).init(); } catch (e) { await store.close(); throw e; }
+  try { scale = await new ScaleService({directory, audits: store, agentRegistry, ...scaleOptions}).init(); } catch (e) { await store.close(); throw e; }
   const sessions = new Map(); let closing = false, pendingCreates = 0;
+  const publicAgents = () => agentRegistry.publicConfig();
+  const defaultResearchConfigured = () => {
+    try {
+      const agents = publicAgents().agents || [];
+      return agents.some(a => a.configured) && agents.some(a => a.configured && a.capabilities?.search === true);
+    } catch { return false; }
+  };
   function limited(key, max) {
     const now = Date.now();
     for (const [k, v] of rate) if (v.until < now) rate.delete(k);
@@ -64,7 +72,6 @@ export async function createApplication({directory = process.env.VERACITY_DATA_D
     })().catch(e => { console.error(JSON.stringify({event: 'persistence_failure', code: e.code || 'STORE_ERROR', id: record.id})); running.delete(record.id); });
   }
   async function newResearch(data, key) {
-    requireThat(configured, 'Live research is not configured. Set server-side OPENAI_API_KEY and OPENAI_MODEL. The worked example is available without keys.', 'PROVIDER_UNCONFIGURED', 503);
     requireThat(typeof data.question === 'string' && data.question.trim().length >= 8 && data.question.length <= 2000, 'Enter a question between 8 and 2,000 characters');
     const fingerprint = auditHash(data);
     if (key) {
@@ -77,16 +84,30 @@ export async function createApplication({directory = process.env.VERACITY_DATA_D
       if (replay) { requireThat(replay.requestFingerprint === fingerprint, 'Idempotency key reused with different input', 'IDEMPOTENCY_CONFLICT', 409); return replay; }
       requireThat(!closing && running.size + pendingCreates < maxRunning, 'Research capacity reached; finish or cancel an active run first', 'BUSY', 429);
       requireThat(existing.length + pendingCreates < maxAssessments, 'Assessment retention limit reached; archive the data directory before adding more', 'RETENTION_LIMIT', 409);
-      let args = {};
+      let args = {}, inheritedAgents = null;
       if (data.parentId) {
         const parent = await store.get(data.parentId);
         requireThat(parent.revision === data.expectedRevision && terminal.has(parent.status) && parent.model, 'Parent assessment changed or is not ready', 'REVISION_CONFLICT', 409);
         requireThat(data.question === parent.question, 'Focused investigation must preserve the original question');
+        inheritedAgents = parent.agents || null;
         args = {previousModel: parent.model, targetNodeId: data.targetNodeId};
       }
+      const orchestratorAgent = data.orchestratorAgent || inheritedAgents?.orchestrator || publicAgents().defaults.orchestrator;
+      let workerAgent = data.workerAgent || inheritedAgents?.worker || publicAgents().defaults.worker;
+      if (configured === undefined) {
+        let roles = agentRegistry.roles({orchestrator: orchestratorAgent, worker: workerAgent});
+        const explicitWorker = Boolean(data.workerAgent || inheritedAgents?.worker);
+        if (!roles.worker.configured && !explicitWorker) {
+          workerAgent = orchestratorAgent;
+          roles = agentRegistry.roles({orchestrator: orchestratorAgent, worker: workerAgent});
+        }
+        requireThat(roles.orchestrator.configured && roles.worker.configured, 'Configure the selected orchestrator and worker agents', 'PROVIDER_UNCONFIGURED', 503);
+        requireThat(typeof roles.worker.search === 'function' && (roles.worker.driver === 'openai' || roles.worker.capabilities?.search === true), 'The selected worker must support source search for live research', 'NO_SEARCH', 503);
+      } else requireThat(configured, 'Live research is not configured. The worked example is available without providers.', 'PROVIDER_UNCONFIGURED', 503);
+      args = {...args, agentRegistry, orchestratorAgent, workerAgent};
       pendingCreates++;
       try {
-      const record = await store.create({question: data.question.trim(), status: 'running', stage: 'Starting research', kind: data.parentId ? 'investigation' : 'live', parentId: data.parentId || null, requestKey: key || null, requestFingerprint: fingerprint, events: [], snapshots: []});
+      const record = await store.create({question: data.question.trim(), status: 'running', stage: 'Starting research', kind: data.parentId ? 'investigation' : 'live', parentId: data.parentId || null, agents: {orchestrator: orchestratorAgent, worker: workerAgent}, requestKey: key || null, requestFingerprint: fingerprint, events: [], snapshots: []});
       launch(record, args); return record;
       } finally { pendingCreates--; }
     })();
@@ -130,7 +151,7 @@ export async function createApplication({directory = process.env.VERACITY_DATA_D
       }
       requireThat(authorized, 'Enter the server access token', 'UNAUTHORIZED', 401);
       if (await scale.handle(req, res, url, {body, json})) return;
-      if (path === '/api/config' && req.method === 'GET') return json(res, 200, {version: '2.0.0-beta.1', researchConfigured: configured, jevConfigured: Boolean(process.env.TYPESAFE_API_KEY), activeRuns: running.size, localOnly: local, calibration: 'not-evaluated'});
+      if (path === '/api/config' && req.method === 'GET') return json(res, 200, {version: '2.0.0-beta.3', researchConfigured: configured === undefined ? defaultResearchConfigured() : configured, agents: publicAgents(), jevConfigured: Boolean(process.env.TYPESAFE_API_KEY), activeRuns: running.size, localOnly: local, calibration: 'not-evaluated'});
       if (path === '/api/assessments' && req.method === 'GET') return json(res, 200, {assessments: (await store.list()).map(a => ({id: a.id, question: a.question, status: a.status, kind: a.kind, updatedAt: a.updatedAt, parentId: a.parentId || null, range: a.analysis?.root.range || null}))});
       if (path === '/api/assessments' && req.method === 'POST') return json(res, 202, await newResearch(await body(req), req.headers['idempotency-key']));
       if (path === '/api/demo' && req.method === 'POST') {

@@ -11,3 +11,5 @@ qa-output/
 .scale-data/
 *.sqlite
 *.sqlite-*
+
+agents.json

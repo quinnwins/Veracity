@@ -2,20 +2,30 @@ import {AuditError, requireThat, normalizeRange, likelihoodRange} from './engine
 import {assertDecomposition, childrenOf, decompositionSystemPrompt, probabilityElicitationPrompt} from './decomposition.mjs';
 import {digest, fetchSource, validateEvidence} from './evidence.mjs';
 import {analyzeGraph} from './graph.mjs';
-import {RunBudget, OpenAIProvider, JevProvider} from './providers.mjs';
+import {RunBudget, JevProvider} from './providers.mjs';
+import {createAgentRegistry} from './agents.mjs';
 export const PIPELINE_VERSION = '2.0.0-beta.1';
 const nonnumeric = n => ['definition', 'value'].includes(n.type);
 const eligible = n => !nonnumeric(n) && !['and', 'or'].includes(n.relation?.kind) && n.atomicity?.status !== 'unresolved';
 const now = () => new Date().toISOString();
-export async function runAudit({question, previousModel, targetNodeId, signal, onProgress = async () => {}, provider, worker, judge, fetcher = fetchSource, limits = {}}) {
+export async function runAudit({question, previousModel, targetNodeId, signal, onProgress = async () => {}, provider, worker, judge, agentRegistry, orchestratorAgent, workerAgent, fetcher = fetchSource, limits = {}}) {
   const budget = provider?.budget || new RunBudget(limits);
-  provider ||= new OpenAIProvider({budget, model: process.env.OPENAI_ORCHESTRATOR_MODEL || process.env.OPENAI_MODEL});
-  worker ||= process.env.OPENAI_WORKER_MODEL ? new OpenAIProvider({budget, model: process.env.OPENAI_WORKER_MODEL}) : provider;
+  let selected = null;
+  if (!provider || !worker) {
+    const registry = agentRegistry || createAgentRegistry();
+    selected = registry.roles({orchestrator: orchestratorAgent, worker: workerAgent, orchestratorBudget: budget, workerBudget: budget});
+    provider ||= selected.orchestrator;
+    if (!worker) {
+      worker = selected.worker.configured ? selected.worker : provider;
+      selected.effectiveWorkerName = selected.worker.configured ? selected.workerName : selected.orchestratorName;
+    }
+  }
   judge ||= new JevProvider({budget});
-  requireThat(provider.configured, 'Live research needs server-side OPENAI_API_KEY and OPENAI_MODEL', 'PROVIDER_UNCONFIGURED', 503);
+  requireThat(provider.configured, 'The selected orchestrator is not configured', 'PROVIDER_UNCONFIGURED', 503);
+  requireThat(worker.configured, 'The selected worker is not configured', 'PROVIDER_UNCONFIGURED', 503);
   const maxNodes = limits.maxNodes || 40, maxRounds = limits.maxRounds || 2, maxTargets = limits.maxTargets || 6;
   const combinedSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(600000)]) : AbortSignal.timeout(600000);
-  const warnings = [], retrieval = [], modelVersions = {requested: provider.model, workerRequested: worker.model, pipeline: PIPELINE_VERSION};
+  const warnings = [], retrieval = [], modelVersions = {requested: provider.model, workerRequested: worker.model, orchestratorAgent: selected?.orchestratorName || provider.name || 'injected', workerAgent: selected?.effectiveWorkerName || selected?.workerName || worker.name || 'injected', orchestratorDriver: provider.driver || 'openai', workerDriver: worker.driver || 'openai', pipeline: PIPELINE_VERSION};
   let model, reviewComplete = false;
   const emit = async stage => { combinedSignal.throwIfAborted(); await onProgress({stage, model: model ? structuredClone(model) : null, usage: budget.snapshot()}); };
   if (previousModel) {
