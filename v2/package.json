@@ -1,0 +1,16 @@
+{
+  "name": "veracity-v2",
+  "private": true,
+  "version": "2.0.0-beta.4",
+  "type": "module",
+  "engines": {
+    "node": ">=22.16"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.mjs",
+    "test": "node --test *.test.mjs test/*.test.mjs",
+    "check": "node scripts/check.mjs",
+    "scale:bench": "node scale/cli.mjs bench",
+    "scale": "node --env-file-if-exists=.env scale/cli.mjs"
+  }
+}

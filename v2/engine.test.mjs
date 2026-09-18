@@ -1,0 +1,31 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {bayesUpdate, normalizeRange, complement, composeRelation, hypothesisPosterior, expectedInformationGain, entropyBinary, validateAssessment, rootSwing} from './engine.mjs';
+const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-12, `${a} != ${b}`);
+const evidence = (lr, id = 'e') => ({id, independenceCluster: id, likelihood: {lr}});
+test('Bayes update matches odds arithmetic', () => bayesUpdate([.5, .5], [evidence([2, 2])]).forEach(p => near(p, 2 / 3)));
+test('duplicate evidence cannot be counted twice by primitive', () => assert.throws(() => bayesUpdate([.5, .5], [evidence([2, 2]), evidence([2, 2])]), /[Dd]uplicate/));
+test('complement respects interval order', () => assert.deepEqual(complement([.2, .4]), [.6, .8]));
+test('unknown dependence AND uses Frechet bounds', () => { const r = composeRelation({kind: 'and', dependence: 'bounded'}, [[.8,.8],[.8,.8]]); near(r[0], .6); near(r[1], .8); });
+test('independent AND multiplies', () => composeRelation({kind: 'and', dependence: 'independent'}, [[.8,.8],[.8,.8]]).forEach(p => near(p, .64)));
+test('missing relation refuses computation', () => assert.throws(() => composeRelation(null, [[.5,.5]]), /[Mm]issing/));
+test('overlapping hypotheses refuse normalization', () => assert.throws(() => hypothesisPosterior([{id:'a',exclusive:false,exhaustive:true}], []), /exclusive/));
+test('EIG recognizes a coherent informative experiment', () => near(expectedInformationGain([.5,.5], [{probability:.5,posterior:[.1,.1]},{probability:.5,posterior:[.9,.9]}]), 1-entropyBinary(.1)));
+test('scored inputs require provenance', () => assert.match(validateAssessment({contract:{wording:'x',falsifier:'y'},rootId:'C0',nodes:{C0:{status:'scored',posterior:[.4,.6]}}}).errors.join(' '), /provenance/));
+for (const [name, value] of [['negative',[-.1,.5]],['over one',[.4,1.1]],['reversed',[.9,.1]],['NaN',[NaN,.5]],['infinity',[0,Infinity]],['string',['0',1]],['missing',[.5]],['null',null]]) {
+  test(`invalid ${name} range is rejected, not silently normalized`, () => assert.throws(() => normalizeRange(value)));
+}
+for (const lr of [[0,1],[-1,1],[1,Infinity],[NaN,2],[3,2]]) test(`reject invalid LR ${JSON.stringify(lr)}`, () => assert.throws(() => bayesUpdate([.3,.7], [evidence(lr)])));
+test('zero and one priors are preserved without epsilon mutation', () => { assert.deepEqual(bayesUpdate([0,1], [evidence([1e-200,1e200])]), [0,1]); assert.deepEqual(bayesUpdate([0,0], []), [0,0]); });
+test('extreme finite LR chain is numerically stable', () => { const r=bayesUpdate([.2,.8], Array.from({length:100},(_,i)=>evidence([1e100,1e100],`e${i}`))); assert.deepEqual(r,[1,1]); });
+test('overlapping OR returns bounds rather than multiplying', () => assert.deepEqual(composeRelation({kind:'or',exclusivity:'overlapping'}, [[.2,.4],[.3,.5]]), [.3,.9]));
+test('impossible exclusive OR sum is rejected', () => assert.throws(() => composeRelation({kind:'or',exclusivity:'exclusive'}, [[.8,.9],[.6,.8]]), /impossible/));
+test('independent OR matches inclusion/exclusion', () => composeRelation({kind:'or',exclusivity:'independent'}, [[.4,.4],[.3,.3]]).forEach(p=>near(p,.58)));
+test('EIG rejects negative outcome weights', () => assert.throws(()=>expectedInformationGain([.5,.5],[{probability:-1,posterior:[0,0]},{probability:2,posterior:[.5,.5]}])));
+test('EIG rejects incoherent posterior means', () => assert.throws(()=>expectedInformationGain([.1,.1],[{probability:1,posterior:[.9,.9]}]), /total probability/));
+test('interval midpoints are not advertised as EIG', () => assert.throws(()=>expectedInformationGain([.2,.8],[{probability:1,posterior:[.5,.5]}]), /point posterior/));
+test('hypothesis likelihoods require a common reference', () => assert.throws(()=>hypothesisPosterior([{id:'A',exclusive:true,exhaustive:true,prior:.5},{id:'B',exclusive:true,exhaustive:true,prior:.5}],[{id:'e',lrPerH:{A:2,B:.5}}]), /shared reference/));
+test('hypothesis priors cannot be silently repaired', () => assert.throws(()=>hypothesisPosterior([{id:'A',exclusive:true,exhaustive:true,prior:1.5}]), /between/));
+test('valid hypothesis posterior has unit mass', () => { const p=hypothesisPosterior([{id:'A',exclusive:true,exhaustive:true,prior:.5},{id:'B',exclusive:true,exhaustive:true,prior:.5}],[{id:'e',commonReference:'same E reference density',lrPerH:{A:2,B:1}}]); near(p.A,2/3); near(p.A+p.B,1); });
+test('empty sensitivity set is rejected', () => assert.throws(()=>rootSwing([.4,.6],[])));
+test('seeded arithmetic properties across 300 scenarios', () => { let seed=92; const rand=()=>((seed=(1664525*seed+1013904223)>>>0)/2**32); for(let i=0;i<300;i++){const p=rand(),q=rand(),lr=10**(rand()*6-3);const posterior=bayesUpdate([p,p],[evidence([lr,lr])])[0];near(posterior,p*lr/(1-p+p*lr));const bound=composeRelation({kind:'and',dependence:'bounded'},[[p,p],[q,q]]);assert.ok(bound[0]<=p*q+1e-12&&bound[1]+1e-12>=p*q);const restored=complement(complement([Math.min(p,q),Math.max(p,q)]));near(restored[0],Math.min(p,q));} });

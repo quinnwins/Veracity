@@ -1,0 +1,15 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {validateDecomposition} from './decomposition.mjs';
+const fixture=()=>({contract:{wording:'A and B',falsifier:'not A or not B'},rootId:'C0',nodes:{C0:{type:'claim',text:'A and B',falsifier:'x',children:['A1','A2'],relation:{kind:'and',dependence:'bounded'}},A1:{type:'atomic',text:'A',falsifier:'not A',children:[]},A2:{type:'atomic',text:'B',falsifier:'not B',children:[]}}});
+test('valid decomposition passes without mutation',()=>{const x=fixture(),before=JSON.stringify(x);assert.equal(validateDecomposition(x).ok,true);assert.equal(JSON.stringify(x),before)});
+test('atomic nodes cannot hide children',()=>{const x=fixture();x.nodes.A1.children=['A2'];assert.match(validateDecomposition(x).errors.join(' '),/atomic node has children/)});
+test('children require explicit semantics',()=>{const x=fixture();delete x.nodes.C0.relation;assert.match(validateDecomposition(x).errors.join(' '),/explicit relation/)});
+test('cycles are rejected',()=>{const x=fixture();x.nodes.A2.type='premise';x.nodes.A2.children=['C0'];x.nodes.A2.relation={kind:'and',dependence:'bounded'};assert.match(validateDecomposition(x).errors.join(' '),/[Cc]ycle/)});
+test('detached rival cycles are rejected',()=>{const x=fixture();x.rivalRootIds=['H1'];x.nodes.H1={type:'hypothesis',text:'rival',falsifier:'x',relation:{kind:'informational',children:['H1']}};assert.equal(validateDecomposition(x).ok,false)});
+test('conflicting child fields cannot silently change graph semantics',()=>{const x=fixture();x.nodes.C0.relation.children=['A1'];assert.match(validateDecomposition(x).errors.join(' '),/conflicting/)});
+test('missing child rejected',()=>{const x=fixture();delete x.nodes.A2;assert.equal(validateDecomposition(x).ok,false)});
+test('duplicate children rejected',()=>{const x=fixture();x.nodes.C0.children=['A1','A1'];assert.equal(validateDecomposition(x).ok,false)});
+test('invalid node identifiers rejected',()=>{const x=fixture();x.nodes.constructor={type:'atomic',text:'x',falsifier:'y'};assert.equal(validateDecomposition(x).ok,false)});
+test('definitions and values are not forced into falsifiers',()=>{const x=fixture();x.nodes.A1={type:'definition',text:'A means the named measurement'};assert.equal(validateDecomposition(x).ok,true)});
+test('node and depth budgets are enforced',()=>{const x=fixture();assert.equal(validateDecomposition(x,{maxNodes:1}).ok,false);assert.equal(validateDecomposition(x,{maxDepth:0}).ok,false)});
+test('unreachable assumptions are not silently dropped',()=>{const x=fixture();x.nodes.A3={type:'atomic',text:'x',falsifier:'y'};assert.match(validateDecomposition(x).errors.join(' '),/unreachable/)});
