@@ -4,7 +4,7 @@
 
 ## Run it
 
-Node.js 22 or later. No runtime packages, API keys, or CDN dependencies are needed for the worked example.
+Node.js 22.16 or later. The Probability Lab uses built-in SQLite (experimental in the tested Node versions). No runtime packages, API keys, or CDN dependencies are needed for the worked example.
 
 ```sh
 cd v2
@@ -49,14 +49,14 @@ Choose an OpenAI model available to your account that supports the Responses API
 - **Assumption sensitivity** measures endpoint movement in the implemented sweeps. It does not measure all structural uncertainties.
 - **Expected information gain** is available as a tested arithmetic function only when a coherent predictive distribution is supplied. The UI otherwise says potential movement; it never fabricates EIG from arbitrary interval midpoints.
 
-Jev's implemented role is a pinned-version **passage relevance diagnostic**. It is stored separately from the likelihood model. Relevance probability is never treated as a likelihood ratio or world-claim probability. Direction, measurement-fit, and semantic duplicate classifiers are future benchmark-gated extensions, not shipped capabilities.
+In the original research pipeline, Jev provides a pinned-version **passage relevance diagnostic**. The new Probability Lab separately provides batched local probability estimates; see `scale/README.md`. It is stored separately from the likelihood model. Relevance probability is never treated as a likelihood ratio or world-claim probability. Direction, measurement-fit, and semantic duplicate classifiers are future benchmark-gated extensions, not shipped capabilities.
 
 Definitions and value choices are separated from empirical claims. Political/electoral requests are directed to descriptive evidence maps, without political rankings, endorsements, or election-outcome probabilities.
 
 ## Evaluation and verification
 
 ```sh
-npm test                  # 147 automated tests at this revision
+npm test                  # 213 automated tests at the Probability Lab revision
 npm run check             # Parse every JS module; check no CDN entrypoint dependency
 node evaluate.mjs reviewed-predictions.jsonl
 ```
@@ -89,3 +89,9 @@ Provider contracts checked against official documentation:
 - https://developers.openai.com/api/docs/guides/tools-web-search
 - https://docs.typesafe.ai/api
 - https://docs.typesafe.ai/models
+
+## Probability Lab: strong orchestration, cheaper workers, Jev breadth
+
+Open `/scale` from the new Probability lab header link. The durable ledger supports up to 100,000 validated local questions, exact-context batching/cache reuse, persistent attempts/budgets, pause/resume, selective stronger-model review and an explicit reviewed-estimate composition API. Guided source expansion is bounded; it does not manufacture 100,000 assumptions from each topic.
+
+Configure `OPENAI_ORCHESTRATOR_MODEL` (or `OPENAI_MODEL` fallback), explicit `OPENAI_WORKER_MODEL`, and `TYPESAFE_API_KEY`. No-key synthetic simulations exercise the real queue/store. `npm run scale:bench -- --count 100000` reproduces the synthetic cold/cache/changed-packet load test. Read `scale/README.md` for API/CLI contracts and `scale/QA_REPORT.md` for executed verification and remaining gates. No real factual calibration is claimed.

@@ -6,3 +6,8 @@ node_modules/
 __pycache__/
 *.log
 qa-output/
+
+# CLI campaigns and SQLite files may contain private evidence.
+.scale-data/
+*.sqlite
+*.sqlite-*
